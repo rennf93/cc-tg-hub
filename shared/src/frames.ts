@@ -1,5 +1,5 @@
 /** Line-delimited JSON frames exchanged between broker and MCP over the UNIX socket.
- * MCP -> broker: register, reply, unregister. Broker -> MCP: registered, message. */
+ * MCP -> broker: register, reply, unregister. Broker -> MCP: registered, message, stop. */
 
 export interface RegisterFrame { type: "register"; sessionId: string; name: string; cwd: string }
 export interface RegisteredFrame { type: "registered"; topicId: number; chatId: string }
@@ -26,9 +26,10 @@ export interface MessageFrame {
   attachment_name?: string;
 }
 export interface UnregisterFrame { type: "unregister" }
+export interface StopFrame { type: "stop" }
 
 export type Frame =
-  | RegisterFrame | RegisteredFrame | ReplyFrame | MessageFrame | UnregisterFrame;
+  | RegisterFrame | RegisteredFrame | ReplyFrame | MessageFrame | UnregisterFrame | StopFrame;
 
 export function encodeFrame(f: Frame): string {
   return JSON.stringify(f) + "\n";

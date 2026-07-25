@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { encodeFrame, parseFrame, type Frame } from "./frames";
+import { encodeFrame, parseFrame, type Frame, type StopFrame } from "./frames";
 
 test("encodeFrame produces one JSON line", () => {
   const line = encodeFrame({ type: "register", sessionId: "s1", name: "foo", cwd: "/x" });
@@ -21,4 +21,16 @@ test("parseFrame round-trips every frame kind", () => {
 
 test("parseFrame rejects malformed JSON", () => {
   expect(() => parseFrame("not json\n")).toThrow();
+});
+
+test("StopFrame round-trips through encode/parse", () => {
+  const f: StopFrame = { type: "stop" };
+  const line = encodeFrame(f);
+  expect(line).toBe('{"type":"stop"}\n');
+  expect(parseFrame(line.trim())).toEqual({ type: "stop" });
+});
+
+test("parseFrame rejects non-object", () => {
+  expect(() => parseFrame('"hello"')).toThrow();
+  expect(() => parseFrame("null")).toThrow();
 });
