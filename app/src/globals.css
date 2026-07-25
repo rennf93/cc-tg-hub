@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+#tg-shell {
+  color-scheme: dark;
+  font-family: -apple-system, "SF Pro Text", system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --background: oklch(0.155 0.014 255);
+  --foreground: oklch(0.935 0.005 255);
+  --card: oklch(0.215 0.018 255);
+  --card-foreground: oklch(0.935 0.005 255);
+  --popover: oklch(0.215 0.018 255);
+  --popover-foreground: oklch(0.935 0.005 255);
+  --primary: oklch(0.8 0.13 78);
+  --primary-foreground: oklch(0.22 0.04 78);
+  --secondary: oklch(0.27 0.02 255);
+  --secondary-foreground: oklch(0.935 0.005 255);
+  --muted: oklch(0.27 0.02 255);
+  --muted-foreground: oklch(0.67 0.014 255);
+  --accent: oklch(0.27 0.02 255);
+  --accent-foreground: oklch(0.935 0.005 255);
+  --destructive: oklch(0.68 0.19 25);
+  --border: oklch(1 0 0 / 7%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.8 0.13 78);
+}
+
+/* Motion vocabulary + helpers — copied verbatim from roboco panel globals.css
+   (#tg-shell block, lines 174-305). The classes are the Mini App's only motion
+   language; everything animates transform/opacity and collapses under
+   prefers-reduced-motion. */
+#tg-shell .tg-display { font-family: ui-monospace, "SF Mono", monospace; font-weight: 400; letter-spacing: 0.01em; }
+#tg-shell .tg-tab-in { animation: tg-rise 0.24s cubic-bezier(0.21, 0.61, 0.35, 1) backwards; }
+#tg-shell .tg-stagger > * { animation: tg-rise 0.3s cubic-bezier(0.21, 0.61, 0.35, 1) backwards; }
+#tg-shell .tg-stagger > *:nth-child(2) { animation-delay: 40ms; }
+#tg-shell .tg-stagger > *:nth-child(3) { animation-delay: 80ms; }
+#tg-shell .tg-stagger > *:nth-child(4) { animation-delay: 120ms; }
+#tg-shell .tg-stagger > *:nth-child(5) { animation-delay: 160ms; }
+#tg-shell .tg-stagger > *:nth-child(n + 6) { animation-delay: 200ms; }
+#tg-shell .tg-scroll-x { overflow-x: auto; scrollbar-width: none; }
+#tg-shell .tg-scroll-x::-webkit-scrollbar { display: none; }
+#tg-shell .tg-slide-in { animation: tg-slide 0.28s cubic-bezier(0.32, 0.72, 0, 1) backwards; }
+#tg-shell .tg-flash { animation: tg-flash 1.4s ease-out 1; }
+@keyframes tg-slide { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes tg-flash { 0% { background-color: color-mix(in oklab, var(--primary) 14%, transparent); } 100% { background-color: transparent; } }
+@keyframes tg-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes tg-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tg-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes tg-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
