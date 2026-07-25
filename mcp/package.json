@@ -1,0 +1,10 @@
+{
+  "name": "@tg-hub/mcp",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "bun src/index.ts", "test": "bun test" },
+  "dependencies": {
+    "@tg-hub/frames": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}

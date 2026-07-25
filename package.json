@@ -1,0 +1,10 @@
+{
+  "name": "tg-hub",
+  "private": true,
+  "workspaces": ["shared", "broker", "mcp"],
+  "scripts": {
+    "broker": "bun --cwd broker src/index.ts",
+    "mcp": "bun --cwd mcp src/index.ts",
+    "smoke": "bun scripts/smoke.ts"
+  }
+}

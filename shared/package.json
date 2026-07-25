@@ -1,0 +1,1 @@
+{ "name": "@tg-hub/frames", "private": true, "exports": { ".": "./src/frames.ts" } }
