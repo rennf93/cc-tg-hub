@@ -77,6 +77,14 @@ export class BotApi {
     });
   }
 
+  async editForumTopicTitle(topicId: number, name: string): Promise<void> {
+    await this.call("editForumTopicTitle", {
+      chat_id: this.groupId,
+      message_thread_id: String(topicId),
+      name,
+    });
+  }
+
   async downloadFile(fileId: string, inboxDir: string): Promise<string> {
     const file = await this.call("getFile", { file_id: fileId });
     const url = `${this.apiRoot}/file/bot${this.token}/${file.file_path}`;

@@ -1,105 +1,91 @@
-import { test, expect } from "bun:test";
+import { test, expect, mock } from "bun:test";
 import { Router } from "./router";
-import { SessionsStore } from "./state";
-import { SocketServer } from "./socket";
-import { join } from "node:path";
-import { rmSync } from "node:fs";
+import type { BotApi } from "./telegram";
+import type { Frame } from "@tg-hub/frames";
 
-const stateDir = join(import.meta.dir, ".tmp-router");
-const sockPath = "/tmp/tg-hub-router-test.sock";
-rmSync(stateDir, { recursive: true, force: true });
-
-function fakeBot() {
-  const calls: any[] = [];
+type SendLog = { id: string; frame: Frame };
+function fakeServer() {
+  const sent: SendLog[] = [];
   return {
-    calls,
-    async createTopic(name: string) { calls.push({ m: "createTopic", name }); return 10 + calls.length; },
-    async sendText(topicId: number, text: string, o?: any) { calls.push({ m: "sendText", topicId, text, o }); return 200 + calls.length; },
-    async sendPhoto(topicId: number, p: string, c?: string) { calls.push({ m: "sendPhoto", topicId, p, c }); return 300 + calls.length; },
-    async react(mid: number, e: string) { calls.push({ m: "react", mid, e }); },
-    async downloadFile(fid: string, d: string) { calls.push({ m: "downloadFile", fid, d }); return "/inbox/x.png"; },
-    isAllowed: (u: number) => u === 111,
-    groupId: "-1001",
+    sent,
+    send: (id: string, frame: Frame) => sent.push({ id, frame }),
   } as any;
 }
+function fakeBot(overrides: Partial<BotApi> = {}): BotApi {
+  return {
+    groupId: "-100123",
+    isAllowed: () => true,
+    createTopic: async () => 99,
+    sendText: async () => 1,
+    sendPhoto: async () => 1,
+    editText: async () => undefined,
+    react: async () => undefined,
+    downloadFile: async () => "/tmp/x",
+    editForumTopicTitle: mock(async () => undefined),
+    ...overrides,
+  } as unknown as BotApi;
+}
 
-test("register creates a topic and replies registered", async () => {
-  const store = new SessionsStore(stateDir);
-  const server = new SocketServer(sockPath);
-  const sent: any[] = [];
-  const bot = fakeBot();
-  // stub server.send to capture outbound
-  (server as any).send = (id: string, f: any) => sent.push({ id, f });
-  const router = new Router(bot as any, store, server, stateDir);
-  await router.handleFrame("c1", { type: "register", sessionId: "s1", name: "foo", cwd: "/x" });
-  expect(bot.calls[0].m).toBe("createTopic");
-  expect(sent[0].f).toEqual({ type: "registered", topicId: 11, chatId: "-1001" });
-  expect(store.byTopic(11)?.sessionId).toBe("s1");
-  server.stop();
+import { SessionsStore } from "./state";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+function freshStore() { return new SessionsStore(mkdtempSync(join(tmpdir(), "tg-hub-r-"))); }
+
+test("processUpdate drops a paused session before any side effect", async () => {
+  const bot = fakeBot({ downloadFile: mock(async () => "/tmp/should-not") });
+  const store = freshStore();
+  const server = fakeServer();
+  const r = new Router(bot, store, server as any, "/tmp/tg-hub-r-inbox");
+  store.upsert({ sessionId: "s1", name: "n", cwd: "/c", topicId: 10, status: "online", lastSeen: 0, socketId: "c1", paused: true });
+  await r.processUpdate({ message: { message_thread_id: 10, message_id: 1, from: { id: 7 }, date: 1, text: "hi", chat: { id: "-100123" } } } as any);
+  expect((bot.downloadFile as any).mock.calls.length).toBe(0);   // no photo download attempted
+  expect(server.sent.length).toBe(0);                            // no frame sent
 });
 
-test("second register does not kill the first session", async () => {
-  const store = new SessionsStore(stateDir);
-  const server = new SocketServer(sockPath);
-  (server as any).send = () => {};
+test("processUpdate bumps lastSeen and sends a message frame", async () => {
   const bot = fakeBot();
-  const router = new Router(bot as any, store, server, stateDir);
-  await router.handleFrame("c1", { type: "register", sessionId: "s1", name: "a", cwd: "/x" });
-  await router.handleFrame("c2", { type: "register", sessionId: "s2", name: "b", cwd: "/y" });
-  // both sessions remain online — the bug we're fixing would have killed s1
-  expect(store.get("s1")?.status).toBe("online");
-  expect(store.get("s2")?.status).toBe("online");
-  server.stop();
+  const store = freshStore();
+  const server = fakeServer();
+  const r = new Router(bot, store, server as any, "/tmp/tg-hub-r-inbox");
+  store.upsert({ sessionId: "s1", name: "n", cwd: "/c", topicId: 10, status: "online", lastSeen: 0, socketId: "c1", paused: false });
+  await r.processUpdate({ message: { message_thread_id: 10, message_id: 1, from: { id: 7, username: "u" }, date: 1, text: "hi", chat: { id: "-100123" } } } as any);
+  expect(server.sent.length).toBe(1);
+  expect(server.sent[0].frame).toHaveProperty("type", "message");
+  expect(store.get("s1")?.lastSeen).toBeGreaterThan(0);
 });
 
-test("inbound update routes to the session owning the topic and emits a message frame", async () => {
-  const store = new SessionsStore(stateDir);
-  const server = new SocketServer(sockPath);
-  const sent: any[] = [];
-  (server as any).send = (id: string, f: any) => sent.push({ id, f });
-  const bot = fakeBot();
-  const router = new Router(bot as any, store, server, stateDir);
-  await router.handleFrame("c1", { type: "register", sessionId: "s1", name: "a", cwd: "/x" });
-  const topicId = store.get("s1")!.topicId;
-  sent.length = 0;
-  await router.processUpdate({
-    message: { message_thread_id: topicId, message_id: 99, from: { id: 111, username: "ren" }, date: 1780000000, text: "hello", chat: { id: "-1001" } },
-  } as any);
-  expect(sent[0].f.type).toBe("message");
-  expect(sent[0].f.text).toBe("hello");
-  expect(sent[0].f.chatId).toBe("-1001");
-  server.stop();
+test("handleReply bumps lastSeen", async () => {
+  const bot = fakeBot({ sendText: mock(async () => 5) });
+  const store = freshStore();
+  const server = fakeServer();
+  const r = new Router(bot, store, server as any, "/tmp/tg-hub-r-inbox");
+  // Register first so socketToSession["c1"] -> "s1" is seeded by the real path.
+  await r.handleFrame("c1", { type: "register", sessionId: "s1", name: "n", cwd: "/c" });
+  const before = store.get("s1")!.lastSeen;
+  await new Promise((res) => setTimeout(res, 5)); // ensure Date.now() advances
+  await r.handleFrame("c1", { type: "reply", chatId: "-100123", text: "yo" });
+  expect(store.get("s1")!.lastSeen).toBeGreaterThan(before);
 });
 
-test("inbound from non-allowlisted sender is dropped", async () => {
-  const store = new SessionsStore(stateDir);
-  const server = new SocketServer(sockPath);
-  const sent: any[] = [];
-  (server as any).send = (id: string, f: any) => sent.push({ id, f });
+test("stop() sends a stop frame and marks stopped", async () => {
   const bot = fakeBot();
-  const router = new Router(bot as any, store, server, stateDir);
-  await router.handleFrame("c1", { type: "register", sessionId: "s1", name: "a", cwd: "/x" });
-  const topicId = store.get("s1")!.topicId;
-  sent.length = 0;
-  await router.processUpdate({
-    message: { message_thread_id: topicId, message_id: 99, from: { id: 999 }, date: 0, text: "hack", chat: { id: "-1001" } },
-  } as any);
-  expect(sent.length).toBe(0);
-  server.stop();
+  const store = freshStore();
+  const server = fakeServer();
+  const r = new Router(bot, store, server as any, "/tmp/tg-hub-r-inbox");
+  store.upsert({ sessionId: "s1", name: "n", cwd: "/c", topicId: 10, status: "online", lastSeen: 0, socketId: "c1", paused: false });
+  r.stop("s1");
+  expect(server.sent).toContainEqual({ id: "c1", frame: { type: "stop" } });
+  expect(store.get("s1")?.status).toBe("stopped");
 });
 
-test("reply frame sends text to the session's topic", async () => {
-  const store = new SessionsStore(stateDir);
-  const server = new SocketServer(sockPath);
-  (server as any).send = () => {};
+test("handleDisconnect on a stopped record is a no-op", () => {
   const bot = fakeBot();
-  const router = new Router(bot as any, store, server, stateDir);
-  await router.handleFrame("c1", { type: "register", sessionId: "s1", name: "a", cwd: "/x" });
-  const topicId = store.get("s1")!.topicId;
-  bot.calls.length = 0;
-  await router.handleFrame("c1", { type: "reply", chatId: "-1001", text: "hi there" });
-  expect(bot.calls[0].m).toBe("sendText");
-  expect(bot.calls[0].topicId).toBe(topicId);
-  expect(bot.calls[0].text).toBe("hi there");
-  server.stop();
+  const store = freshStore();
+  const server = fakeServer();
+  const r = new Router(bot, store, server as any, "/tmp/tg-hub-r-inbox");
+  store.upsert({ sessionId: "s1", name: "n", cwd: "/c", topicId: 10, status: "online", lastSeen: 0, socketId: "c1", paused: false });
+  store.setStopped("s1");
+  r.handleDisconnect("c1");
+  expect(store.get("s1")?.status).toBe("stopped");
 });

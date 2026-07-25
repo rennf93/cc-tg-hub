@@ -57,6 +57,7 @@ export class Router {
       status: "online",
       lastSeen: Date.now(),
       socketId,
+      paused: false,
     });
     this.server.send(socketId, { type: "registered", topicId, chatId: this.bot.groupId });
   }
@@ -72,6 +73,12 @@ export class Router {
       }
     }
     void mid;
+    this.bumpLastSeen(rec.sessionId);
+  }
+
+  private bumpLastSeen(sessionId: string): void {
+    const r = this.store.get(sessionId);
+    if (r) { r.lastSeen = Date.now(); }
   }
 
   async processUpdate(u: TelegramUpdate): Promise<void> {
@@ -82,6 +89,7 @@ export class Router {
     if (topicId === undefined) return; // not in a topic — ignore (no general chat)
     const rec = this.store.byTopic(topicId);
     if (!rec || rec.status !== "online" || !rec.socketId) return; // no live session for this topic
+    if (rec.paused) return;   // paused: drop inbound before any side effect
     let text = msg.text ?? msg.caption ?? "";
     let image_path: string | undefined;
     let attachment_file_id: string | undefined;
@@ -110,6 +118,7 @@ export class Router {
       attachment_name,
     };
     this.server.send(rec.socketId, frame);
+    this.bumpLastSeen(rec.sessionId);
   }
 
   handleDisconnect(socketId: string): void {
@@ -118,5 +127,14 @@ export class Router {
       this.socketToSession.delete(socketId);
       this.store.setOffline(sessionId);
     }
+  }
+
+  stop(sessionId: string): void {
+    const rec = this.store.get(sessionId);
+    if (!rec || rec.status === "stopped") return;
+    if (rec.socketId) this.server.send(rec.socketId, { type: "stop" });
+    this.store.setStopped(sessionId);
+    // Drop the socket mapping so a late frame from the dying MCP is ignored.
+    for (const [sid, sess] of this.socketToSession) if (sess === sessionId) this.socketToSession.delete(sid);
   }
 }
