@@ -71,6 +71,10 @@ export interface TelegramWebApp {
   /** Bot API 7.7+ — stops vertical swipes from minimizing the app so
    * scrolling a list never accidentally dismisses the cockpit. */
   disableVerticalSwipes?: () => void;
+  /** Open a Telegram t.me link inside the Telegram client (Bot API 6.1+). */
+  openTelegramLink?: (url: string) => void;
+  /** Native confirm dialog — callback receives true on confirm, false on dismiss (Bot API 6.2+). */
+  showConfirm?: (message: string, callback: (ok: boolean) => void) => void;
   /** Bot API 6.1+/7.10+ — paint Telegram's own window chrome (titlebar,
    * app background, bottom bar) so the cockpit blends edge-to-edge into
    * the client instead of sitting framed inside default chrome. */
