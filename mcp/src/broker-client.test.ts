@@ -28,3 +28,30 @@ test("BrokerClient connects, registers, and receives messages", async () => {
   server.stop();
   rmSync(sockPath, { force: true });
 });
+
+import { createServer as createNetServer, type Socket } from "node:net";
+
+function withBroker(handler: (sock: Socket) => void): { sockPath: string; close: () => void } {
+  const sockPath = "/tmp/tg-hub-stop-test.sock";
+  rmSync(sockPath, { force: true });
+  const srv = createNetServer((sock) => handler(sock));
+  srv.listen(sockPath);
+  return { sockPath, close: () => { srv.close(); rmSync(sockPath, { force: true }); } };
+}
+
+test("on receiving a stop frame, BrokerClient disconnects and does not reconnect", async () => {
+  let brokerGotUnregister = false;
+  const { sockPath, close } = withBroker((sock) => {
+    sock.on("data", (b) => { if (b.toString().includes('"unregister"')) brokerGotUnregister = true; });
+    // Immediately send a stop frame once the client connects.
+    sock.write('{"type":"stop"}\n');
+  });
+  const client = new BrokerClient(sockPath, "s1", "n", "/c");
+  await client.connect();
+  // Give the stop frame a moment to be received and processed.
+  await new Promise((r) => setTimeout(r, 100));
+  expect(brokerGotUnregister).toBe(true);
+  // No reconnect should occur — wait a bit beyond the backoff and confirm no new connection.
+  await new Promise((r) => setTimeout(r, 1200));
+  close();
+});

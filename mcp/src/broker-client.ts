@@ -10,6 +10,7 @@ export class BrokerClient {
   private buf = "";
   private onMsg: (f: MessageFrame) => void = () => {};
   private onReg: (f: RegisteredFrame) => void = () => {};
+  private onStoppedCb: () => void = () => {};
   private stopped = false;
   private sockPath: string;
   private sessionId: string;
@@ -47,6 +48,7 @@ export class BrokerClient {
           this.buf = this.buf.slice(nl + 1);
           if (f.type === "message") this.onMsg(f);
           else if (f.type === "registered") this.onReg(f);
+          else if (f.type === "stop") { this.onStoppedCb(); this.disconnect(); }
         }
       });
     });
@@ -54,6 +56,7 @@ export class BrokerClient {
 
   onMessage(cb: (f: MessageFrame) => void): void { this.onMsg = cb; }
   onRegistered(cb: (f: RegisteredFrame) => void): void { this.onReg = cb; }
+  onStopped(cb: () => void): void { this.onStoppedCb = cb; }
 
   sendReply(chatId: string, text: string, opts: { replyTo?: string; files?: string[]; format?: "text" | "markdownv2" } = {}): void {
     this.sock?.write(encodeFrame({ type: "reply", chatId, text, replyTo: opts.replyTo, files: opts.files, format: opts.format }));
