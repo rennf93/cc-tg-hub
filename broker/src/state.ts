@@ -1,6 +1,5 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync } from "node:fs";
 import { join } from "node:path";
-import { createHash } from "node:crypto";
 
 export interface SessionRecord {
   sessionId: string;
@@ -70,9 +69,4 @@ export class SessionsStore {
     }
     return undefined;
   }
-}
-
-/** Stable fallback id when CLAUDE_SESSION_ID is absent. */
-export function sessionKeyHash(name: string, cwd: string): string {
-  return createHash("sha1").update(`${name}\0${cwd}`).digest("hex").slice(0, 16);
 }

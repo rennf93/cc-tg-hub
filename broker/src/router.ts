@@ -1,5 +1,5 @@
 import type { BotApi } from "./telegram";
-import { SessionsStore, sessionKeyHash } from "./state";
+import { SessionsStore } from "./state";
 import type { SocketServer } from "./socket";
 import type { Frame, MessageFrame, ReplyFrame } from "@tg-hub/frames";
 
@@ -19,7 +19,6 @@ interface TelegramUpdate {
 
 export class Router {
   private socketToSession = new Map<string, string>();   // socketId -> sessionId
-  private socketToConn = new Map<string, string>();        // socketId -> socketId (for server.send)
   private bot: BotApi;
   private store: SessionsStore;
   private server: SocketServer;
