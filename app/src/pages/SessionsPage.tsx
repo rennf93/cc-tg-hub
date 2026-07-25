@@ -23,9 +23,9 @@ export function SessionsPage({ onOpen }: { onOpen: (s: SessionView) => void }) {
 
   return (
     <div className="tg-stagger space-y-3 p-3 pb-24">
-      <h1 className="tg-brand text-[13px] tracking-[0.3em] text-foreground">tg-hub</h1>
+      <h1 className="tg-brand text-[13px] tracking-[0.3em] text-foreground">cc-tg-hub</h1>
       {sessions.length === 0 && (
-        <p className="px-1 text-sm text-muted-foreground">No sessions registered. Start <code className="text-foreground">claude</code> with the tg-hub MCP enabled.</p>
+        <p className="px-1 text-sm text-muted-foreground">No sessions registered. Start <code className="text-foreground">claude</code> with the cc-tg-hub MCP enabled.</p>
       )}
       {GROUPS.map(({ key, label }) => {
         const rows = sessions.filter((s) => s.status === key);

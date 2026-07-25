@@ -1,7 +1,7 @@
 import { test, expect, mock } from "bun:test";
 import { Router } from "./router";
 import type { BotApi } from "./telegram";
-import type { Frame } from "@tg-hub/frames";
+import type { Frame } from "@cc-tg-hub/frames";
 
 type SendLog = { id: string; frame: Frame };
 function fakeServer() {
@@ -30,13 +30,13 @@ import { SessionsStore } from "./state";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-function freshStore() { return new SessionsStore(mkdtempSync(join(tmpdir(), "tg-hub-r-"))); }
+function freshStore() { return new SessionsStore(mkdtempSync(join(tmpdir(), "cc-tg-hub-r-"))); }
 
 test("processUpdate drops a paused session before any side effect", async () => {
   const bot = fakeBot({ downloadFile: mock(async () => "/tmp/should-not") });
   const store = freshStore();
   const server = fakeServer();
-  const r = new Router(bot, store, server as any, "/tmp/tg-hub-r-inbox");
+  const r = new Router(bot, store, server as any, "/tmp/cc-tg-hub-r-inbox");
   store.upsert({ sessionId: "s1", name: "n", cwd: "/c", topicId: 10, status: "online", lastSeen: 0, socketId: "c1", paused: true });
   await r.processUpdate({ message: { message_thread_id: 10, message_id: 1, from: { id: 7 }, date: 1, text: "hi", chat: { id: "-100123" } } } as any);
   expect((bot.downloadFile as any).mock.calls.length).toBe(0);   // no photo download attempted
@@ -47,7 +47,7 @@ test("processUpdate bumps lastSeen and sends a message frame", async () => {
   const bot = fakeBot();
   const store = freshStore();
   const server = fakeServer();
-  const r = new Router(bot, store, server as any, "/tmp/tg-hub-r-inbox");
+  const r = new Router(bot, store, server as any, "/tmp/cc-tg-hub-r-inbox");
   store.upsert({ sessionId: "s1", name: "n", cwd: "/c", topicId: 10, status: "online", lastSeen: 0, socketId: "c1", paused: false });
   await r.processUpdate({ message: { message_thread_id: 10, message_id: 1, from: { id: 7, username: "u" }, date: 1, text: "hi", chat: { id: "-100123" } } } as any);
   expect(server.sent.length).toBe(1);
@@ -59,7 +59,7 @@ test("handleReply bumps lastSeen", async () => {
   const bot = fakeBot({ sendText: mock(async () => 5) });
   const store = freshStore();
   const server = fakeServer();
-  const r = new Router(bot, store, server as any, "/tmp/tg-hub-r-inbox");
+  const r = new Router(bot, store, server as any, "/tmp/cc-tg-hub-r-inbox");
   // Register first so socketToSession["c1"] -> "s1" is seeded by the real path.
   await r.handleFrame("c1", { type: "register", sessionId: "s1", name: "n", cwd: "/c" });
   const before = store.get("s1")!.lastSeen;
@@ -72,7 +72,7 @@ test("stop() sends a stop frame and marks stopped", async () => {
   const bot = fakeBot();
   const store = freshStore();
   const server = fakeServer();
-  const r = new Router(bot, store, server as any, "/tmp/tg-hub-r-inbox");
+  const r = new Router(bot, store, server as any, "/tmp/cc-tg-hub-r-inbox");
   store.upsert({ sessionId: "s1", name: "n", cwd: "/c", topicId: 10, status: "online", lastSeen: 0, socketId: "c1", paused: false });
   r.stop("s1");
   expect(server.sent).toContainEqual({ id: "c1", frame: { type: "stop" } });
@@ -83,7 +83,7 @@ test("handleDisconnect on a stopped record is a no-op", () => {
   const bot = fakeBot();
   const store = freshStore();
   const server = fakeServer();
-  const r = new Router(bot, store, server as any, "/tmp/tg-hub-r-inbox");
+  const r = new Router(bot, store, server as any, "/tmp/cc-tg-hub-r-inbox");
   store.upsert({ sessionId: "s1", name: "n", cwd: "/c", topicId: 10, status: "online", lastSeen: 0, socketId: "c1", paused: false });
   store.setStopped("s1");
   r.handleDisconnect("c1");
@@ -94,7 +94,7 @@ test("handleRegister does not resurrect a stopped session — re-sends stop", as
   const bot = fakeBot();
   const store = freshStore();
   const server = fakeServer();
-  const r = new Router(bot, store, server as any, "/tmp/tg-hub-r-inbox");
+  const r = new Router(bot, store, server as any, "/tmp/cc-tg-hub-r-inbox");
   // A stopped session whose socket died before the stop frame was delivered.
   store.upsert({ sessionId: "s1", name: "n", cwd: "/c", topicId: 10, status: "stopped", lastSeen: 0, socketId: "", paused: false });
   // The same MCP (same sessionId) reconnects on a fresh socket.
@@ -112,7 +112,7 @@ test("handleRegister still admits a re-register of an online/offline session", a
   const bot = fakeBot();
   const store = freshStore();
   const server = fakeServer();
-  const r = new Router(bot, store, server as any, "/tmp/tg-hub-r-inbox");
+  const r = new Router(bot, store, server as any, "/tmp/cc-tg-hub-r-inbox");
   store.upsert({ sessionId: "s1", name: "n", cwd: "/c", topicId: 10, status: "offline", lastSeen: 0, socketId: "", paused: false });
   await r.handleFrame("c2", { type: "register", sessionId: "s1", name: "n", cwd: "/c" });
   expect(store.get("s1")?.status).toBe("online");

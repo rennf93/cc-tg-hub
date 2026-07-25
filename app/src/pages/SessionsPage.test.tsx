@@ -17,7 +17,7 @@ test("SessionsPage renders Online/Offline groups from fetched data", async () =>
     // Initial render shows the empty-state until the fetch resolves; force the
     // effect by awaiting a microtask flush via the rendered string. We at least
     // assert the component mounts without throwing and renders a container.
-    expect(html).toContain("tg-hub");
+    expect(html).toContain("cc-tg-hub");
   } finally {
     globalThis.fetch = orig;
   }

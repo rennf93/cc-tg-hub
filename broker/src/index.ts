@@ -16,7 +16,7 @@ async function main(): Promise<void> {
   const router = new Router(botApi, store, server, config.stateDir);
 
   await server.start((socketId, frame) => router.handleFrame(socketId, frame));
-  process.stderr.write(`tg-hub broker: socket at ${config.socketPath}\n`);
+  process.stderr.write(`cc-tg-hub broker: socket at ${config.socketPath}\n`);
 
   const api = new Api(botApi, store, router, config);
   const distDir = join(config.stateDir, "app-dist");   // deploy step will point this at the built app
@@ -33,7 +33,7 @@ async function main(): Promise<void> {
       return new Response("not found", { status: 404 });
     },
   });
-  process.stderr.write(`tg-hub broker: http on :${http.port}\n`);
+  process.stderr.write(`cc-tg-hub broker: http on :${http.port}\n`);
 
   const bot = createBot(config);
   bot.on("message:text", (ctx) => router.processUpdate(ctx.update as any));
@@ -47,7 +47,7 @@ async function main(): Promise<void> {
   // bot.start() runs the long-poll loop; only message updates needed.
   await bot.start({
     allowed_updates: ["message"],
-    onStart: () => process.stderr.write("tg-hub broker: polling Telegram\n"),
+    onStart: () => process.stderr.write("cc-tg-hub broker: polling Telegram\n"),
   });
 }
 

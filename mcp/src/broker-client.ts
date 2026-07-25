@@ -1,9 +1,9 @@
 import { connect, type Socket } from "node:net";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { encodeFrame, parseFrame, type Frame, type MessageFrame, type RegisteredFrame } from "@tg-hub/frames";
+import { encodeFrame, parseFrame, type Frame, type MessageFrame, type RegisteredFrame } from "@cc-tg-hub/frames";
 
-const DEFAULT_SOCKET = join(homedir(), ".claude", "tg-hub", "broker.sock");
+const DEFAULT_SOCKET = join(homedir(), ".claude", "cc-tg-hub", "broker.sock");
 
 export class BrokerClient {
   private sock: Socket | null = null;

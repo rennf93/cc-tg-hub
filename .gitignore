@@ -218,12 +218,12 @@ __marimo__/
 # Node / Bun
 node_modules/
 
-# tg-hub — test/runtime scratch artifacts
+# cc-tg-hub — test/runtime scratch artifacts
 /broker/src/.tmp-*/
 /scripts/.smoke-*/
 /broker/src/.tmp-*.sock
 
-# tg-hub — never commit docs/artifacts (user rule 2026-07-25)
+# cc-tg-hub — never commit docs/artifacts (user rule 2026-07-25)
 /docs/
 /.superpowers/
 /CLAUDE.md

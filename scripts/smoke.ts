@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { rmSync, mkdirSync } from "node:fs";
 
 const stateDir = join(import.meta.dir, ".smoke-state");
-const sockPath = "/tmp/tg-hub-smoke.sock";
+const sockPath = "/tmp/cc-tg-hub-smoke.sock";
 rmSync(stateDir, { recursive: true, force: true });
 rmSync(sockPath, { force: true });
 mkdirSync(stateDir, { recursive: true });

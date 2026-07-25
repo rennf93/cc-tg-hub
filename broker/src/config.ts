@@ -6,8 +6,8 @@ export interface Config {
   botToken: string;
   groupId: string;          // supergroup id with topics enabled, e.g. "-1001234567890"
   allowUserIds: number[];    // operator Telegram user IDs
-  socketPath: string;        // default ~/.claude/tg-hub/broker.sock
-  stateDir: string;          // default ~/.claude/tg-hub
+  socketPath: string;        // default ~/.claude/cc-tg-hub/broker.sock
+  stateDir: string;          // default ~/.claude/cc-tg-hub
   apiRoot?: string;          // override Bot API root (for tests); defaults to Telegram
   idleMs: number;            // operator idle timeout, default 5min
   authFreshnessMs: number;   // auth window, default 24h
@@ -17,7 +17,7 @@ export interface Config {
 }
 
 export function defaultStateDir(): string {
-  return join(homedir(), ".claude", "tg-hub");
+  return join(homedir(), ".claude", "cc-tg-hub");
 }
 
 export function loadConfig(path = join(defaultStateDir(), "config.json")): Config {

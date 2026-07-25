@@ -31,7 +31,7 @@ function writeCfg(dir: string, raw: object): string {
 }
 
 test("defaults applied when Phase 2 fields absent", () => {
-  const dir = mkdtempSync(join(tmpdir(), "tg-hub-cfg-"));
+  const dir = mkdtempSync(join(tmpdir(), "cc-tg-hub-cfg-"));
   const p = writeCfg(dir, { botToken: "t", groupId: "-1001", allowUserIds: [7] });
   const c = loadConfig(p);
   expect(c.idleMs).toBe(300000);
@@ -42,7 +42,7 @@ test("defaults applied when Phase 2 fields absent", () => {
 });
 
 test("explicit values honored", () => {
-  const dir = mkdtempSync(join(tmpdir(), "tg-hub-cfg-"));
+  const dir = mkdtempSync(join(tmpdir(), "cc-tg-hub-cfg-"));
   const p = writeCfg(dir, { botToken: "t", groupId: "-1001", allowUserIds: [7], idleMs: 60000, httpPort: 9000, webAppOrigin: "https://app.example" });
   const c = loadConfig(p);
   expect(c.idleMs).toBe(60000);

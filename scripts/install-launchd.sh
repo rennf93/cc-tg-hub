@@ -2,8 +2,8 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-PLIST="$HOME/Library/LaunchAgents/com.tg-hub.broker.plist"
-STATE_DIR="$HOME/.claude/tg-hub"
+PLIST="$HOME/Library/LaunchAgents/com.cc-tg-hub.broker.plist"
+STATE_DIR="$HOME/.claude/cc-tg-hub"
 
 mkdir -p -m 700 "$STATE_DIR" "$STATE_DIR/logs"
 
@@ -12,7 +12,7 @@ cat > "$PLIST" <<EOF
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>com.tg-hub.broker</string>
+  <key>Label</key><string>com.cc-tg-hub.broker</string>
   <key>ProgramArguments</key>
   <array>
     <string>$(command -v bun)</string>

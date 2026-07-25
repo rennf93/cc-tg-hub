@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 function dist(): string {
-  const d = mkdtempSync(join(tmpdir(), "tg-hub-dist-"));
+  const d = mkdtempSync(join(tmpdir(), "cc-tg-hub-dist-"));
   writeFileSync(join(d, "index.html"), "<!doctype html><div id=\"root\"></div>");
   mkdirSync(join(d, "assets"), { recursive: true });
   writeFileSync(join(d, "assets/app.js"), "console.log('x')");

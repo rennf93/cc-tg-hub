@@ -4,7 +4,7 @@ import { rmSync } from "node:fs";
 import { SocketServer } from "../../broker/src/socket";
 import { BrokerClient } from "./broker-client";
 
-const sockPath = "/tmp/tg-hub-mcp-test.sock";
+const sockPath = "/tmp/cc-tg-hub-mcp-test.sock";
 rmSync(sockPath, { force: true });
 
 test("BrokerClient connects, registers, and receives messages", async () => {
@@ -32,7 +32,7 @@ test("BrokerClient connects, registers, and receives messages", async () => {
 import { createServer as createNetServer, type Socket } from "node:net";
 
 function withBroker(handler: (sock: Socket) => void): { sockPath: string; close: () => void } {
-  const sockPath = "/tmp/tg-hub-stop-test.sock";
+  const sockPath = "/tmp/cc-tg-hub-stop-test.sock";
   rmSync(sockPath, { force: true });
   const srv = createNetServer((sock) => handler(sock));
   srv.listen(sockPath);

@@ -1,7 +1,7 @@
 import { createServer as createNetServer, type Socket } from "node:net";
 import { mkdirSync, rmSync, chmodSync } from "node:fs";
 import { dirname } from "node:path";
-import { encodeFrame, parseFrame, type Frame } from "@tg-hub/frames";
+import { encodeFrame, parseFrame, type Frame } from "@cc-tg-hub/frames";
 
 export type FrameHandler = (socketId: string, frame: Frame) => Promise<void>;
 

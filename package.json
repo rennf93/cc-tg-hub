@@ -1,5 +1,5 @@
 {
-  "name": "tg-hub",
+  "name": "cc-tg-hub",
   "private": true,
   "workspaces": ["shared", "broker", "mcp", "app"],
   "scripts": {

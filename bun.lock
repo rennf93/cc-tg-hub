@@ -3,10 +3,10 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "tg-hub",
+      "name": "cc-tg-hub",
     },
     "app": {
-      "name": "@tg-hub/app",
+      "name": "@cc-tg-hub/app",
       "dependencies": {
         "@phosphor-icons/react": "^2.1.7",
         "clsx": "^2.1.1",
@@ -25,21 +25,21 @@
       },
     },
     "broker": {
-      "name": "@tg-hub/broker",
+      "name": "@cc-tg-hub/broker",
       "dependencies": {
-        "@tg-hub/frames": "workspace:*",
+        "@cc-tg-hub/frames": "workspace:*",
         "grammy": "^1.21.0",
       },
     },
     "mcp": {
-      "name": "@tg-hub/mcp",
+      "name": "@cc-tg-hub/mcp",
       "dependencies": {
+        "@cc-tg-hub/frames": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.0.0",
-        "@tg-hub/frames": "workspace:*",
       },
     },
     "shared": {
-      "name": "@tg-hub/frames",
+      "name": "@cc-tg-hub/frames",
     },
   },
   "packages": {
@@ -80,6 +80,14 @@
     "@babel/traverse": ["@babel/traverse@7.29.7", "", { "dependencies": { "@babel/code-frame": "^7.29.7", "@babel/generator": "^7.29.7", "@babel/helper-globals": "^7.29.7", "@babel/parser": "^7.29.7", "@babel/template": "^7.29.7", "@babel/types": "^7.29.7", "debug": "^4.3.1" } }, "sha512-EhlfNQtZ+NK22w5BM61ciuiq1m58ed33Wr1Xan//ZRTy6hgjnwyCffRYwzsGXdASJSUJ1guZILsErh1eQcl+zw=="],
 
     "@babel/types": ["@babel/types@7.29.7", "", { "dependencies": { "@babel/helper-string-parser": "^7.29.7", "@babel/helper-validator-identifier": "^7.29.7" } }, "sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA=="],
+
+    "@cc-tg-hub/app": ["@cc-tg-hub/app@workspace:app"],
+
+    "@cc-tg-hub/broker": ["@cc-tg-hub/broker@workspace:broker"],
+
+    "@cc-tg-hub/frames": ["@cc-tg-hub/frames@workspace:shared"],
+
+    "@cc-tg-hub/mcp": ["@cc-tg-hub/mcp@workspace:mcp"],
 
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.25.12", "", { "os": "aix", "cpu": "ppc64" }, "sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA=="],
 
@@ -232,14 +240,6 @@
     "@tailwindcss/oxide-win32-x64-msvc": ["@tailwindcss/oxide-win32-x64-msvc@4.3.3", "", { "os": "win32", "cpu": "x64" }, "sha512-yJ0pwIVc/nYeGoV02WtsN8KYyLQv7kyI2wDnkezyJlGGjkd4QLwDGAwl47YpPJeuI0M0ObaXGSPjvWDPeTPggw=="],
 
     "@tailwindcss/vite": ["@tailwindcss/vite@4.3.3", "", { "dependencies": { "@tailwindcss/node": "4.3.3", "@tailwindcss/oxide": "4.3.3", "tailwindcss": "4.3.3" }, "peerDependencies": { "vite": "^5.2.0 || ^6 || ^7 || ^8" } }, "sha512-yYU8cogLeSh/ms2jh8Fj7jaba/EWa7Ja6GoUqYZaraEuCI5YS6ms6ObZgjjedm+jm6XZjdNRWBpPP6Z86oOxcw=="],
-
-    "@tg-hub/app": ["@tg-hub/app@workspace:app"],
-
-    "@tg-hub/broker": ["@tg-hub/broker@workspace:broker"],
-
-    "@tg-hub/frames": ["@tg-hub/frames@workspace:shared"],
-
-    "@tg-hub/mcp": ["@tg-hub/mcp@workspace:mcp"],
 
     "@types/babel__core": ["@types/babel__core@7.20.5", "", { "dependencies": { "@babel/parser": "^7.20.7", "@babel/types": "^7.20.7", "@types/babel__generator": "*", "@types/babel__template": "*", "@types/babel__traverse": "*" } }, "sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA=="],
 

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 function freshStore(): { store: SessionsStore; dir: string } {
-  const dir = mkdtempSync(join(tmpdir(), "tg-hub-state-"));
+  const dir = mkdtempSync(join(tmpdir(), "cc-tg-hub-state-"));
   return { store: new SessionsStore(dir), dir };
 }
 

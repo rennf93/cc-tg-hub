@@ -1,7 +1,7 @@
 import type { BotApi } from "./telegram";
 import { SessionsStore } from "./state";
 import type { SocketServer } from "./socket";
-import type { Frame, MessageFrame, ReplyFrame } from "@tg-hub/frames";
+import type { Frame, MessageFrame, ReplyFrame } from "@cc-tg-hub/frames";
 
 interface TelegramUpdate {
   message?: {

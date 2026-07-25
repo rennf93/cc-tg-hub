@@ -1,10 +1,10 @@
 {
-  "name": "@tg-hub/broker",
+  "name": "@cc-tg-hub/broker",
   "private": true,
   "type": "module",
   "scripts": { "start": "bun src/index.ts", "test": "bun test" },
   "dependencies": {
-    "@tg-hub/frames": "workspace:*",
+    "@cc-tg-hub/frames": "workspace:*",
     "grammy": "^1.21.0"
   }
 }

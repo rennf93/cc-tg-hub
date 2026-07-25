@@ -30,7 +30,7 @@ function cfg(over: Record<string, unknown> = {}) {
     webAppOrigin: "http://localhost:5173", ...over,
   } as any;
 }
-function freshStore() { return new SessionsStore(mkdtempSync(join(tmpdir(), "tg-hub-api-"))); }
+function freshStore() { return new SessionsStore(mkdtempSync(join(tmpdir(), "cc-tg-hub-api-"))); }
 function fakeRouter() { return { stop: () => undefined } as any; }
 
 test("validateInitData accepts a valid signature for an allowlisted user", () => {

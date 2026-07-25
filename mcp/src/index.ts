@@ -4,7 +4,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 import { basename } from "node:path";
 import { BrokerClient } from "./broker-client";
 
-const sessionId = process.env.CLAUDE_SESSION_ID || `tg-hub-${Date.now().toString(36)}`;
+const sessionId = process.env.CLAUDE_SESSION_ID || `cc-tg-hub-${Date.now().toString(36)}`;
 const name = process.env.TG_HUB_SESSION_NAME || basename(process.cwd());
 const cwd = process.cwd();
 
@@ -12,7 +12,7 @@ const client = new BrokerClient(undefined, sessionId, name, cwd);
 let lastChatId: string | undefined;
 
 const mcp = new Server(
-  { name: "tg-hub", version: "0.1.0" },
+  { name: "cc-tg-hub", version: "0.1.0" },
   {
     capabilities: { tools: {}, experimental: { "claude/channel": {} } },
     instructions: [
@@ -80,4 +80,4 @@ async function main(): Promise<void> {
   await mcp.connect(new StdioServerTransport());
 }
 
-void main().catch((e) => { process.stderr.write(`tg-hub mcp fatal: ${e}\n`); process.exit(1); });
+void main().catch((e) => { process.stderr.write(`cc-tg-hub mcp fatal: ${e}\n`); process.exit(1); });

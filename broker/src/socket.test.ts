@@ -2,9 +2,9 @@ import { test, expect } from "bun:test";
 import { rmSync, statSync } from "node:fs";
 import { connect } from "node:net";
 import { SocketServer } from "./socket";
-import { encodeFrame } from "@tg-hub/frames";
+import { encodeFrame } from "@cc-tg-hub/frames";
 
-const sockPath = "/tmp/tg-hub-socket-test.sock";
+const sockPath = "/tmp/cc-tg-hub-socket-test.sock";
 rmSync(sockPath, { force: true });
 
 test("server receives frames and can send back", async () => {
@@ -25,7 +25,7 @@ test("server receives frames and can send back", async () => {
 });
 
 test("socket file is created mode 0o600", async () => {
-  const p = "/tmp/tg-hub-socket-mode.sock";
+  const p = "/tmp/cc-tg-hub-socket-mode.sock";
   const server = new SocketServer(p);
   await server.start(async () => {});
   const mode = statSync(p).mode & 0o777;
