@@ -47,3 +47,8 @@ test("isAllowed reflects allowlist", () => {
   expect(api.isAllowed(111)).toBe(true);
   expect(api.isAllowed(333)).toBe(false);
 });
+
+test("groupId is publicly readable", () => {
+  const api = new BotApi("t:token", "-1001", undefined, [1]);
+  expect(api.groupId).toBe("-1001");
+});

@@ -7,7 +7,7 @@ const TELEGRAM = "https://api.telegram.org";
 
 export class BotApi {
   private token: string;
-  private groupId: string;
+  readonly groupId: string;
   private apiRoot: string;
   private allowUserIds: Set<number>;
 
