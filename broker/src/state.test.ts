@@ -1,32 +1,68 @@
-import { test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdirSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { test, expect } from "bun:test";
 import { SessionsStore } from "./state";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-const tmp = join(import.meta.dir, ".tmp-state");
+function freshStore(): { store: SessionsStore; dir: string } {
+  const dir = mkdtempSync(join(tmpdir(), "tg-hub-state-"));
+  return { store: new SessionsStore(dir), dir };
+}
 
-beforeEach(() => mkdirSync(tmp, { recursive: true }));
-afterEach(() => rmSync(tmp, { recursive: true, force: true }));
+function reg(store: SessionsStore, sessionId: string, topicId: number) {
+  store.upsert({ sessionId, name: "n", cwd: "/c", topicId, status: "online", lastSeen: 0, socketId: "c1", paused: false });
+}
 
-test("upsert + byTopic round-trips and persists", () => {
-  const s = new SessionsStore(tmp);
-  s.upsert({ sessionId: "s1", name: "foo", cwd: "/x", topicId: 42, status: "online", lastSeen: 1, socketId: "c1" });
-  expect(s.byTopic(42)?.sessionId).toBe("s1");
-  const s2 = new SessionsStore(tmp); // reload from disk
-  expect(s2.byTopic(42)?.sessionId).toBe("s1");
+test("upsert defaults are explicit; paused persists", () => {
+  const { store } = freshStore();
+  reg(store, "s1", 10);
+  store.setPaused("s1", true);
+  expect(store.get("s1")?.paused).toBe(true);
 });
 
-test("setOffline keeps topic mapping", () => {
-  const s = new SessionsStore(tmp);
-  s.upsert({ sessionId: "s1", name: "foo", cwd: "/x", topicId: 42, status: "online", lastSeen: 1, socketId: "c1" });
-  s.setOffline("s1");
-  expect(s.get("s1")?.status).toBe("offline");
-  expect(s.byTopic(42)?.sessionId).toBe("s1");
+test("setStopped then setOffline does NOT downgrade to offline", () => {
+  const { store } = freshStore();
+  reg(store, "s1", 10);
+  store.setStopped("s1");
+  store.setOffline("s1"); // e.g. socket closes after stop — must stay stopped
+  expect(store.get("s1")?.status).toBe("stopped");
 });
 
-test("reuseKey returns existing topicId for same name+cwd", () => {
-  const s = new SessionsStore(tmp);
-  s.upsert({ sessionId: "old", name: "foo", cwd: "/x", topicId: 42, status: "offline", lastSeen: 0, socketId: "" });
-  expect(s.reuseKey("foo", "/x")).toBe(42);
-  expect(s.reuseKey("foo", "/y")).toBeUndefined();
+test("setOffline works for a non-stopped session", () => {
+  const { store } = freshStore();
+  reg(store, "s1", 10);
+  store.setOffline("s1");
+  expect(store.get("s1")?.status).toBe("offline");
+  expect(store.get("s1")?.socketId).toBe("");
+});
+
+test("rename updates name", () => {
+  const { store } = freshStore();
+  reg(store, "s1", 10);
+  store.rename("s1", "new-name");
+  expect(store.get("s1")?.name).toBe("new-name");
+});
+
+test("reuseKey finds prior topic by name+cwd", () => {
+  const { store } = freshStore();
+  reg(store, "s1", 42);
+  expect(store.reuseKey("n", "/c")).toBe(42);
+  expect(store.reuseKey("other", "/c")).toBeUndefined();
+});
+
+test("record + topic mapping persist across reload", () => {
+  const { store, dir } = freshStore();
+  reg(store, "s1", 42);
+  const reloaded = new SessionsStore(dir);
+  expect(reloaded.get("s1")?.name).toBe("n");
+  expect(reloaded.byTopic(42)?.sessionId).toBe("s1");
+  expect(reloaded.get("s1")?.paused).toBe(false);
+});
+
+test("setOffline keeps the topic mapping", () => {
+  const { store } = freshStore();
+  reg(store, "s1", 42);
+  store.setOffline("s1");
+  expect(store.get("s1")?.status).toBe("offline");
+  expect(store.byTopic(42)?.sessionId).toBe("s1");
 });

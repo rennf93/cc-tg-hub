@@ -6,9 +6,10 @@ export interface SessionRecord {
   name: string;
   cwd: string;
   topicId: number;
-  status: "online" | "idle" | "offline";
+  status: "online" | "offline" | "stopped";   // idle + paused derived, not stored
   lastSeen: number;
   socketId: string;
+  paused: boolean;
 }
 
 export class SessionsStore {
@@ -23,6 +24,8 @@ export class SessionsStore {
     if (existsSync(this.path)) {
       const arr = JSON.parse(readFileSync(this.path, "utf8")) as SessionRecord[];
       for (const r of arr) {
+        if (r.paused === undefined) r.paused = false;
+        if (r.status === "idle") r.status = "online";   // legacy: idle is now derived
         this.byId.set(r.sessionId, r);
         this.byTopicId.set(r.topicId, r);
       }
@@ -57,8 +60,32 @@ export class SessionsStore {
   setOffline(sessionId: string): void {
     const r = this.byId.get(sessionId);
     if (!r) return;
+    if (r.status === "stopped") return;      // ponytail: don't downgrade a stopped session
     r.status = "offline";
     r.socketId = "";
+    this.persist();
+  }
+
+  setPaused(sessionId: string, paused: boolean): void {
+    const r = this.byId.get(sessionId);
+    if (!r) return;
+    r.paused = paused;
+    this.persist();
+  }
+
+  setStopped(sessionId: string): void {
+    const r = this.byId.get(sessionId);
+    if (!r) return;
+    r.status = "stopped";
+    r.paused = false;
+    r.socketId = "";
+    this.persist();
+  }
+
+  rename(sessionId: string, name: string): void {
+    const r = this.byId.get(sessionId);
+    if (!r) return;
+    r.name = name;
     this.persist();
   }
 
