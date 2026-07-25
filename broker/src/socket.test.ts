@@ -1,11 +1,10 @@
 import { test, expect } from "bun:test";
-import { join } from "node:path";
 import { rmSync } from "node:fs";
 import { connect } from "node:net";
 import { SocketServer } from "./socket";
 import { encodeFrame } from "@tg-hub/frames";
 
-const sockPath = join(import.meta.dir, ".tmp-socket.sock");
+const sockPath = "/tmp/tg-hub-socket-test.sock";
 rmSync(sockPath, { force: true });
 
 test("server receives frames and can send back", async () => {
