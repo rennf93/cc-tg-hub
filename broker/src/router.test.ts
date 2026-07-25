@@ -89,3 +89,34 @@ test("handleDisconnect on a stopped record is a no-op", () => {
   r.handleDisconnect("c1");
   expect(store.get("s1")?.status).toBe("stopped");
 });
+
+test("handleRegister does not resurrect a stopped session — re-sends stop", async () => {
+  const bot = fakeBot();
+  const store = freshStore();
+  const server = fakeServer();
+  const r = new Router(bot, store, server as any, "/tmp/tg-hub-r-inbox");
+  // A stopped session whose socket died before the stop frame was delivered.
+  store.upsert({ sessionId: "s1", name: "n", cwd: "/c", topicId: 10, status: "stopped", lastSeen: 0, socketId: "", paused: false });
+  // The same MCP (same sessionId) reconnects on a fresh socket.
+  await r.handleFrame("c2", { type: "register", sessionId: "s1", name: "n", cwd: "/c" });
+  // The session stays stopped — not resurrected to online.
+  expect(store.get("s1")?.status).toBe("stopped");
+  // The fresh socket was told to stop (so the MCP disconnects and won't loop).
+  expect(server.sent.some((s) => s.id === "c2" && s.frame.type === "stop")).toBe(true);
+  // No registered frame was sent — the MCP is not being admitted.
+  expect(server.sent.some((s) => s.frame.type === "registered")).toBe(false);
+});
+
+test("handleRegister still admits a re-register of an online/offline session", async () => {
+  // Regression guard: the new guard must not block the normal reconnect path.
+  const bot = fakeBot();
+  const store = freshStore();
+  const server = fakeServer();
+  const r = new Router(bot, store, server as any, "/tmp/tg-hub-r-inbox");
+  store.upsert({ sessionId: "s1", name: "n", cwd: "/c", topicId: 10, status: "offline", lastSeen: 0, socketId: "", paused: false });
+  await r.handleFrame("c2", { type: "register", sessionId: "s1", name: "n", cwd: "/c" });
+  expect(store.get("s1")?.status).toBe("online");
+  expect(store.get("s1")?.socketId).toBe("c2");
+  expect(server.sent.some((s) => s.id === "c2" && s.frame.type === "registered")).toBe(true);
+  expect(server.sent.some((s) => s.frame.type === "stop")).toBe(false);
+});

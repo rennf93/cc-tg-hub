@@ -43,6 +43,17 @@ export class Router {
   }
 
   private async handleRegister(socketId: string, f: { sessionId: string; name: string; cwd: string }): Promise<void> {
+    // A stopped session must not be resurrected by a re-register: if the socket
+    // died before the stop frame was delivered, the still-alive MCP (stopped=false)
+    // reconnects after backoff and lands here. Re-send stop to the fresh socket so
+    // the MCP finally honors it, disconnects, and won't reconnect again; leave the
+    // record stopped. (Safe because sessionId is per-process — a new claude session
+    // gets a new sessionId, so this only catches the same-MCP reconnect, not a legit
+    // restart.)
+    if (this.store.get(f.sessionId)?.status === "stopped") {
+      this.server.send(socketId, { type: "stop" });
+      return;
+    }
     // Reuse an existing topic for this (name, cwd) if a prior session used one — keeps history.
     let topicId = this.store.reuseKey(f.name, f.cwd);
     if (topicId === undefined) {
