@@ -219,3 +219,10 @@ __marimo__/
 
 # Node / Bun
 node_modules/
+
+# tg-hub — never commit docs/artifacts (user rule 2026-07-25)
+/docs/
+/.superpowers/
+/CLAUDE.md
+/PROGRESS.md
+*.design.md
