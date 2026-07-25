@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "tg-hub": {
+      "command": "bun",
+      "args": ["--cwd", "/ABS/PATH/TO/claude-telegram-hub/mcp", "src/index.ts"]
+    }
+  }
+}
