@@ -84,7 +84,7 @@ export class BotApi {
     const buf = Buffer.from(await res.arrayBuffer());
     const ext = (file.file_path as string).split(".").pop() ?? "bin";
     const path = join(inboxDir, `${Date.now()}-${fileId.slice(-8)}.${ext}`);
-    mkdirSync(inboxDir, { recursive: true });
+    mkdirSync(inboxDir, { recursive: true, mode: 0o700 });
     writeFileSync(path, buf);
     return path;
   }

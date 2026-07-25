@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 
@@ -19,6 +19,8 @@ export class SessionsStore {
 
   constructor(stateDir: string) {
     this.path = join(stateDir, "sessions.json");
+    mkdirSync(stateDir, { recursive: true, mode: 0o700 });
+    chmodSync(stateDir, 0o700);
     if (existsSync(this.path)) {
       const arr = JSON.parse(readFileSync(this.path, "utf8")) as SessionRecord[];
       for (const r of arr) {
@@ -29,7 +31,7 @@ export class SessionsStore {
   }
 
   private persist(): void {
-    mkdirSync(join(this.path, ".."), { recursive: true });
+    mkdirSync(join(this.path, ".."), { recursive: true, mode: 0o700 });
     writeFileSync(this.path, JSON.stringify([...this.byId.values()], null, 2));
   }
 

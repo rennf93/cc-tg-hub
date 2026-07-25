@@ -1,5 +1,5 @@
 import { createServer as createNetServer, type Socket } from "node:net";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, chmodSync } from "node:fs";
 import { dirname } from "node:path";
 import { encodeFrame, parseFrame, type Frame } from "@tg-hub/frames";
 
@@ -19,10 +19,11 @@ export class SocketServer {
 
   async start(handler: FrameHandler): Promise<void> {
     this.handler = handler;
-    mkdirSync(dirname(this.sockPath), { recursive: true });
+    mkdirSync(dirname(this.sockPath), { recursive: true, mode: 0o700 });
     rmSync(this.sockPath, { force: true });
     this.server.on("connection", (sock) => this.onConnection(sock));
     await new Promise<void>((r) => this.server.listen(this.sockPath, r));
+    chmodSync(this.sockPath, 0o600);
   }
 
   private onConnection(sock: Socket): void {

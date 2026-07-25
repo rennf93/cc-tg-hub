@@ -26,6 +26,7 @@ export class BrokerClient {
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       const onErr = (e: unknown) => { if (!this.stopped) reject(e); };
+      this.buf = "";
       this.sock = connect(this.sockPath);
       this.sock.on("error", onErr);
       this.sock.on("close", () => {

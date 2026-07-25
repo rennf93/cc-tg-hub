@@ -5,7 +5,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 PLIST="$HOME/Library/LaunchAgents/com.tg-hub.broker.plist"
 STATE_DIR="$HOME/.claude/tg-hub"
 
-mkdir -p "$STATE_DIR/logs"
+mkdir -p -m 700 "$STATE_DIR" "$STATE_DIR/logs"
 
 cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
