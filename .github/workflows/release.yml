@@ -56,6 +56,8 @@ jobs:
       id-token: write
     env:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # bun publish reads NPM_CONFIG_TOKEN for registry auth (not ~/.npmrc).
+      NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -76,6 +78,4 @@ jobs:
       # promoted to job-level env and gated via env.NPM_TOKEN here.
       - name: Publish to npm
         if: env.NPM_TOKEN != ''
-        run: |
-          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
-          bun publish --access public
+        run: bun publish --access public
