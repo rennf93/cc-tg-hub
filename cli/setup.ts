@@ -9,13 +9,18 @@ const CTRL_C = "\u0003";
 const DEL = "\u007f";
 
 async function tg(token: string, method: string, form: Record<string, string> = {}): Promise<any> {
-  const body = new FormData();
+  // Use application/x-www-form-urlencoded, NOT FormData: Bun 1.3.8's fetch with
+  // a multipart FormData body gets HTTP 400 + empty body from api.telegram.org
+  // (Telegram's nginx rejects Bun's multipart framing); URLSearchParams works.
+  const body = new URLSearchParams();
   for (const [k, v] of Object.entries(form)) if (v !== undefined && v !== null) body.append(k, v);
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 35000);
   try {
-    const res = await fetch(`${API}/bot${token}/${method}`, { method: "POST", body, signal: ctrl.signal });
-    const json = await res.json() as any;
+    const res = await fetch(`${API}/bot${token}/${method}`, { method: "POST", body });
+    const text = await res.text();
+    if (text.length === 0) throw new Error(`Telegram returned HTTP ${res.status} with an empty body`);
+    const json = JSON.parse(text) as any;
     if (!json.ok) throw new Error(json.description ?? JSON.stringify(json));
     return json.result;
   } finally { clearTimeout(t); }
