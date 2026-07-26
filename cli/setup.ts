@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, copyFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { STATE_DIR, CONFIG_PATH, stopBroker } from "./daemon";
@@ -100,10 +100,19 @@ export async function setup(): Promise<void> {
   try { chmodSync(CONFIG_PATH, 0o600); } catch {}
   ok(`wrote ${CONFIG_PATH}`);
 
+  // Wire the MCP to a STABLE copy of the bundled CLI, not the bunx temp dir.
+  // The bundled dist/cli.js is self-contained (all deps inlined), so a single
+  // copied file runs both the MCP and the broker it spawns. bunx installs into
+  // a macOS-cleaned /var/folders/.../T path that vanishes on reboot, which
+  // breaks the MCP wiring; ~/.claude/cc-tg-hub/cli.js persists.
   const pkgRoot = join(import.meta.dir, "..");
-  const cliJs = join(pkgRoot, "dist", "cli.js");
-  const mcpEntry = existsSync(cliJs)
-    ? { command: "bun", args: [cliJs, "mcp"] }
+  const srcCli = existsSync(join(pkgRoot, "dist", "cli.js"))
+    ? join(pkgRoot, "dist", "cli.js")
+    : join(import.meta.dir, "cli.js");  // bundled: import.meta.dir is <pkgRoot>/dist
+  const stableCli = join(STATE_DIR, "cli.js");
+  if (existsSync(srcCli)) { copyFileSync(srcCli, stableCli); try { chmodSync(stableCli, 0o755); } catch {} }
+  const mcpEntry = existsSync(stableCli)
+    ? { command: "bun", args: [stableCli, "mcp"] }
     : { command: "bun", args: [join(pkgRoot, "mcp", "src", "index.ts")] };
 
   let settings: any = {};
