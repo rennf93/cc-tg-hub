@@ -1,12 +1,32 @@
 {
   "name": "cc-tg-hub",
-  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Telegram Mini App for multiple Claude Code sessions — one bot, one broker, one MCP per session.",
+  "license": "MIT",
+  "author": "Renn F",
+  "homepage": "https://github.com/rennf93/cc-tg-hub",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rennf93/cc-tg-hub.git"
+  },
+  "keywords": ["claude-code", "telegram", "mcp", "mini-app", "claude"],
+  "bin": {
+    "cc-tg-hub": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "workspaces": ["shared", "broker", "mcp", "app"],
   "scripts": {
     "broker": "bun --cwd broker src/index.ts",
     "mcp": "bun --cwd mcp src/index.ts",
     "smoke": "bun scripts/smoke.ts",
     "app": "bun run --cwd app dev",
-    "app:build": "bun run --cwd app build"
+    "app:build": "bun run --cwd app build",
+    "build:cli": "bun build cli/index.ts --bundle --target=bun --format=esm --outfile=dist/cli.js && chmod +x dist/cli.js",
+    "prepublishOnly": "bun run build:cli"
   }
 }

@@ -5,11 +5,23 @@ import { SocketServer } from "./socket";
 import { Router } from "./router";
 import { Api } from "./api";
 import { serveStatic } from "./static";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 
 async function main(): Promise<void> {
   const config = loadConfig();
+
+  // Detached daemon (spawned by the MCP when claude starts): mirror stderr to
+  // a log file so `cc-tg-hub logs` can show it. Foreground dev runs keep stderr.
+  const pidPath = join(config.stateDir, "broker.pid");
+  if (process.env.CC_TG_HUB_DAEMON === "1") {
+    mkdirSync(join(config.stateDir, "logs"), { recursive: true });
+    const sink = Bun.file(join(config.stateDir, "logs", "broker.err.log")).writer();
+    const orig = process.stderr.write.bind(process.stderr);
+    (process.stderr as any).write = (chunk: any, ...rest: any[]) => { try { sink.write(chunk); } catch {} return orig(chunk, ...rest); };
+    process.on("exit", () => { try { sink.end(); } catch {} });
+  }
+
   const store = new SessionsStore(config.stateDir);
   const server = new SocketServer(config.socketPath);
   const botApi = new BotApi(config.botToken, config.groupId, config.apiRoot, config.allowUserIds);
@@ -34,13 +46,17 @@ async function main(): Promise<void> {
     },
   });
   process.stderr.write(`cc-tg-hub broker: http on :${http.port}\n`);
+  // Bind succeeded (socket + http): claim the pidfile. A duplicate spawn that
+  // lost the bind race fatal-exits before reaching here, so the pidfile always
+  // points at the winning broker.
+  writeFileSync(pidPath, String(process.pid));
 
   const bot = createBot(config);
   bot.on("message:text", (ctx) => router.processUpdate(ctx.update as any));
   bot.on("message:photo", (ctx) => router.processUpdate(ctx.update as any));
   bot.on("message:document", (ctx) => router.processUpdate(ctx.update as any));
 
-  const stop = () => { bot.stop(); server.stop(); http.stop(); process.exit(0); };
+  const stop = () => { try { unlinkSync(pidPath); } catch {} bot.stop(); server.stop(); http.stop(); process.exit(0); };
   process.on("SIGTERM", stop);
   process.on("SIGINT", stop);
 

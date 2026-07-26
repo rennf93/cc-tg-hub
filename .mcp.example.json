@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "cc-tg-hub": {
-      "command": "bun",
-      "args": ["--cwd", "/ABS/PATH/TO/cc-tg-hub/mcp", "src/index.ts"]
-    }
-  }
-}
