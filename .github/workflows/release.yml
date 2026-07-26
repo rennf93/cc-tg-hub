@@ -54,6 +54,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -70,10 +72,10 @@ jobs:
         run: bun run build:cli
 
       # No-op until NPM_TOKEN is set as a repo secret; then every v* tag publishes.
+      # `secrets` is not allowed in `if:` (actions/runner#520), so the token is
+      # promoted to job-level env and gated via env.NPM_TOKEN here.
       - name: Publish to npm
-        if: ${{ secrets.NPM_TOKEN != '' }}
+        if: env.NPM_TOKEN != ''
         run: |
           echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
           bun publish --access public
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
