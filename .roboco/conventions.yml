@@ -1,0 +1,39 @@
+# Architectural conventions for this project.
+# Auto-scaffolded by RoboCo — edit freely; this file is canonical.
+# Each module lists definition KINDS forbidden in it; rules toggle
+# warn/block; waivers are accountable, PR-reviewed escape hatches.
+version: 1
+languages:
+- typescript
+modules:
+- path: app/src/components
+  purpose: UI components
+  forbidden:
+  - model
+  - route
+- path: app/src/lib
+  purpose: shared helpers / utilities
+  forbidden:
+  - route
+  - component
+rules:
+  god_class:
+    level: warn
+  thin_components:
+    level: block
+  modular_cohesion:
+    level: block
+  no_routes_in_lib:
+    level: block
+  no_inline_comments:
+    level: warn
+  no_components_in_lib:
+    level: block
+  no_lint_suppressions:
+    level: block
+  no_models_in_components:
+    level: block
+  no_routes_in_components:
+    level: block
+custom: []
+waivers: []
