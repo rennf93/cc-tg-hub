@@ -10,9 +10,11 @@ Each Claude Code session becomes a forum topic you chat with from your phone. On
    ```sh
    bunx cc-tg-hub setup
    ```
-   Paste the bot token when prompted, then send any message (e.g. `/start`) in your group. setup detects the group and your user id from that message, writes `~/.claude/cc-tg-hub/config.json`, and wires the MCP into `~/.claude/settings.json` globally — so every `claude` session gets it with no per-project config.
+   Paste the bot token when prompted, then send any message (e.g. `/start`) in your group. setup detects the group and your user id from that message, writes `~/.claude/cc-tg-hub/config.json`, and wires the MCP into `~/.claude.json` globally — so every `claude` session gets it with no per-project config. It also pre-allows `mcp__cc-tg-hub__reply` in `~/.claude/settings.json` so unattended sessions can reply without a permission prompt; sessions installed before this change need one manual "Yes, and don't ask again" approval on the first reply.
 
-3. **Use:** Run `claude` in any project. A forum topic appears in your group; message it from your phone and Claude replies via the `reply` tool.
+3. **Use:** Launch sessions with `claude --dangerously-load-development-channels server:cc-tg-hub` — an Anthropic research-preview feature (claude ≥ 2.x, requires claude.ai/Console auth, not Bedrock/Vertex) that's needed for inbound Telegram messages to reach Claude at all. Alias it, e.g. `alias claude-tg='claude --dangerously-load-development-channels server:cc-tg-hub'`. **Accept the "Loading development channels" warning at launch** (Enter) — without that the channel never attaches and inbound messages are silently dropped. Verify with `/status`: it should read `Channels: Listening for messages from server:cc-tg-hub`. A forum topic appears in your group; message it from your phone and Claude replies via the `reply` tool.
+
+   > **Known upstream limitation (Claude Code ≤ 2.1.220):** channel messages only render in **fresh** conversations. In a resumed conversation (`--continue`, `--resume`, or the in-app resume picker) the host receives the notifications but silently drops them — verified with a minimal repro. Start a new conversation when you need the Telegram bridge.
 
 The broker starts itself the first time you open `claude` (the MCP claude spawns brings it up as a detached background process) and stays up across sessions. You never start or manage it by hand. If you need to: `cc-tg-hub status` / `cc-tg-hub stop` / `cc-tg-hub logs` / `cc-tg-hub uninstall`.
 
