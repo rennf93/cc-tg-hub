@@ -13,7 +13,7 @@ interface TelegramUpdate {
     caption?: string;
     photo?: Array<{ file_id: string; file_unique_id: string }>;
     document?: { file_id: string; file_name?: string };
-    chat: { id: string };
+    chat: { id: number };   // Telegram sends this as a NUMBER — MessageFrame.chatId is a string
   };
 }
 
@@ -94,13 +94,15 @@ export class Router {
 
   async processUpdate(u: TelegramUpdate): Promise<void> {
     const msg = u.message;
-    if (!msg || !msg.from) return;
-    if (!this.bot.isAllowed(msg.from.id)) return; // trust boundary
+    if (!msg || !msg.from) { process.stderr.write(`[trace] update: no msg/from\n`); return; }
+    if (!this.bot.isAllowed(msg.from.id)) { process.stderr.write(`[trace] update from ${msg.from.id}: not allowed\n`); return; } // trust boundary
     const topicId = msg.message_thread_id;
-    if (topicId === undefined) return; // not in a topic — ignore (no general chat)
+    process.stderr.write(`[trace] update from ${msg.from.username ?? msg.from.id}: topicId=${topicId} text=${JSON.stringify(msg.text ?? msg.caption ?? "").slice(0,40)}\n`);
+    if (topicId === undefined) { process.stderr.write(`[trace] drop: no topicId (not in a topic)\n`); return; } // not in a topic — ignore (no general chat)
     const rec = this.store.byTopic(topicId);
-    if (!rec || rec.status !== "online" || !rec.socketId) return; // no live session for this topic
-    if (rec.paused) return;   // paused: drop inbound before any side effect
+    if (!rec || rec.status !== "online" || !rec.socketId) { process.stderr.write(`[trace] drop: no live session for topicId=${topicId} (rec=${rec ? rec.sessionId : "none"} status=${rec?.status})\n`); return; } // no live session for this topic
+    if (rec.paused) { process.stderr.write(`[trace] drop: session ${rec.sessionId} paused\n`); return; }   // paused: drop inbound before any side effect
+    process.stderr.write(`[trace] forwarding to session ${rec.sessionId} (socket ${rec.socketId})\n`);
     let text = msg.text ?? msg.caption ?? "";
     let image_path: string | undefined;
     let attachment_file_id: string | undefined;
@@ -116,7 +118,7 @@ export class Router {
     }
     const frame: MessageFrame = {
       type: "message",
-      chatId: msg.chat.id,
+      chatId: String(msg.chat.id),
       topicId,
       messageId: String(msg.message_id),
       user: msg.from.username ?? String(msg.from.id),
@@ -128,14 +130,25 @@ export class Router {
       attachment_kind,
       attachment_name,
     };
+    if (!this.server.has(rec.socketId)) {
+      // Record says online but the socket is gone (send() would silently no-op) —
+      // e.g. the close event hasn't reached the router yet. Drop and correct the record.
+      process.stderr.write(`[trace] drop: socket ${rec.socketId} not live for session ${rec.sessionId}\n`);
+      this.store.setOffline(rec.sessionId);
+      return;
+    }
     this.server.send(rec.socketId, frame);
     this.bumpLastSeen(rec.sessionId);
   }
 
   handleDisconnect(socketId: string): void {
     const sessionId = this.socketToSession.get(socketId);
-    if (sessionId) {
-      this.socketToSession.delete(socketId);
+    this.socketToSession.delete(socketId);
+    // Reconnect race: the MCP can register a new socket for the same sessionId
+    // before the OLD socket's close event fires. Only offline the record if it
+    // still points at THIS closing socketId — otherwise a stale close would
+    // clobber the freshly-reconnected session.
+    if (sessionId && this.store.get(sessionId)?.socketId === socketId) {
       this.store.setOffline(sessionId);
     }
   }

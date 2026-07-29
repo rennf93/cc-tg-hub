@@ -2,7 +2,17 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { basename } from "node:path";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { BrokerClient } from "./broker-client";
+
+// Diagnostic log to ~/.claude/cc-tg-hub/logs/mcp.log (the MCP's stderr is
+// captured by claude and hard to inspect; this file is always readable).
+const MCP_LOG = join(homedir(), ".claude", "cc-tg-hub", "logs", "mcp.log");
+function log(msg: string): void {
+  try { mkdirSync(join(homedir(), ".claude", "cc-tg-hub", "logs"), { recursive: true }); appendFileSync(MCP_LOG, `${new Date().toISOString()} ${msg}\n`); } catch {}
+}
 
 const sessionId = process.env.CLAUDE_SESSION_ID || `cc-tg-hub-${Date.now().toString(36)}`;
 const name = process.env.TG_HUB_SESSION_NAME || basename(process.cwd());
@@ -27,21 +37,28 @@ const mcp = new Server(
 
 client.onMessage((f) => {
   lastChatId = f.chatId;
-  void mcp.notification({
+  log(`inbound from ${f.user} chat=${f.chatId} text=${JSON.stringify(f.text ?? "").slice(0, 60)}`);
+  // claude's channel schema is strict — content and EVERY meta value must be a
+  // string. One number (Telegram chat ids are numeric) throws inside claude's
+  // notification handler, which tears down the whole MCP connection: the message
+  // is lost and the session goes deaf until restart. Coerce at the boundary.
+  const meta = Object.fromEntries(
+    Object.entries({
+      chat_id: f.chatId,
+      message_id: f.messageId,
+      user: f.user,
+      user_id: f.userId,
+      ts: f.ts,
+      image_path: f.image_path,
+      attachment_file_id: f.attachment_file_id,
+      attachment_kind: f.attachment_kind,
+      attachment_name: f.attachment_name,
+    }).filter(([, v]) => v != null && v !== "").map(([k, v]) => [k, String(v)]),
+  );
+  mcp.notification({
     method: "notifications/claude/channel",
-    params: {
-      content: f.text,
-      meta: {
-        chat_id: f.chatId,
-        ...(f.messageId ? { message_id: f.messageId } : {}),
-        user: f.user,
-        user_id: f.userId,
-        ts: f.ts,
-        ...(f.image_path ? { image_path: f.image_path } : {}),
-        ...(f.attachment_file_id ? { attachment_file_id: f.attachment_file_id, attachment_kind: f.attachment_kind, attachment_name: f.attachment_name } : {}),
-      },
-    },
-  });
+    params: { content: String(f.text ?? ""), meta },
+  }).then(() => log(`notification delivered`)).catch((e) => log(`notification FAILED: ${e}`));
 });
 
 mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -76,8 +93,14 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
 });
 
 async function main(): Promise<void> {
-  await client.connect();
+  // Start the stdio server (claude's MCP handshake) BEFORE connecting to the
+  // broker. client.connect() spawns the broker if it's down and can take
+  // several seconds waiting for the socket; doing that first meant claude's
+  // handshake timed out and it dropped the server. Handshake first, then the
+  // (possibly slow) broker connect — messages can't arrive until the broker is
+  // up anyway, so onMessage won't fire before mcp.connect() completes.
   await mcp.connect(new StdioServerTransport());
+  await client.connect();
 }
 
 void main().catch((e) => { process.stderr.write(`cc-tg-hub mcp fatal: ${e}\n`); process.exit(1); });

@@ -4,11 +4,12 @@ import type { BotApi } from "./telegram";
 import type { Frame } from "@cc-tg-hub/frames";
 
 type SendLog = { id: string; frame: Frame };
-function fakeServer() {
+function fakeServer(opts: { live?: Set<string> } = {}) {
   const sent: SendLog[] = [];
   return {
     sent,
     send: (id: string, frame: Frame) => sent.push({ id, frame }),
+    has: (id: string) => (opts.live ? opts.live.has(id) : true),   // default: every socketId is live
   } as any;
 }
 function fakeBot(overrides: Partial<BotApi> = {}): BotApi {
@@ -53,6 +54,25 @@ test("processUpdate bumps lastSeen and sends a message frame", async () => {
   expect(server.sent.length).toBe(1);
   expect(server.sent[0].frame).toHaveProperty("type", "message");
   expect(store.get("s1")?.lastSeen).toBeGreaterThan(0);
+});
+
+test("processUpdate stringifies Telegram's numeric chat.id", async () => {
+  // Regression: Telegram sends chat.id as a NUMBER. Forwarding it raw put a number
+  // in MessageFrame.chatId -> claude's channel schema (every meta value must be a
+  // string) threw in its notification handler and dropped the MCP connection, so
+  // every inbound message was lost. Tests used to pass a string id and missed it.
+  const bot = fakeBot();
+  const store = freshStore();
+  const server = fakeServer();
+  const r = new Router(bot, store, server as any, "/tmp/cc-tg-hub-r-inbox");
+  store.upsert({ sessionId: "s1", name: "n", cwd: "/c", topicId: 10, status: "online", lastSeen: 0, socketId: "c1", paused: false });
+  await r.processUpdate({ message: { message_thread_id: 10, message_id: 1, from: { id: 7, username: "u" }, date: 1, text: "hi", chat: { id: -1004389179455 } } } as any);
+  const frame = server.sent[0].frame as any;
+  expect(frame.chatId).toBe("-1004389179455");
+  for (const [k, v] of Object.entries(frame)) {
+    if (k === "topicId" || v === undefined) continue;
+    expect(typeof v).toBe("string");   // everything claude sees as meta must be a string
+  }
 });
 
 test("handleReply bumps lastSeen", async () => {
@@ -119,4 +139,49 @@ test("handleRegister still admits a re-register of an online/offline session", a
   expect(store.get("s1")?.socketId).toBe("c2");
   expect(server.sent.some((s) => s.id === "c2" && s.frame.type === "registered")).toBe(true);
   expect(server.sent.some((s) => s.frame.type === "stop")).toBe(false);
+});
+
+test("processUpdate drops when the record's socketId is not live, and marks it offline", async () => {
+  const bot = fakeBot({ downloadFile: mock(async () => "/tmp/should-not") });
+  const store = freshStore();
+  const server = fakeServer({ live: new Set() });   // no socketId is live
+  const r = new Router(bot, store, server as any, "/tmp/cc-tg-hub-r-inbox");
+  store.upsert({ sessionId: "s1", name: "n", cwd: "/c", topicId: 10, status: "online", lastSeen: 0, socketId: "c1", paused: false });
+  await r.processUpdate({ message: { message_thread_id: 10, message_id: 1, from: { id: 7 }, date: 1, text: "hi", chat: { id: "-100123" } } } as any);
+  expect(server.sent.length).toBe(0);
+  expect(store.get("s1")?.status).toBe("offline");
+});
+
+test("handleDisconnect of a stale socketId after reconnect does not offline the record (race guard)", async () => {
+  const bot = fakeBot();
+  const store = freshStore();
+  const server = fakeServer();
+  const r = new Router(bot, store, server as any, "/tmp/cc-tg-hub-r-inbox");
+  await r.handleFrame("c1", { type: "register", sessionId: "s1", name: "n", cwd: "/c" });
+  await r.handleFrame("c2", { type: "register", sessionId: "s1", name: "n", cwd: "/c" }); // reconnect on new socket first
+  r.handleDisconnect("c1"); // old socket's close arrives late
+  expect(store.get("s1")?.status).toBe("online");
+  expect(store.get("s1")?.socketId).toBe("c2");
+});
+
+test("two live sessions sharing (name,cwd): first session's reply still resolves after the second registers (no ping-pong eviction)", async () => {
+  const bot = fakeBot({ sendText: mock(async () => 5) });
+  const store = freshStore();
+  const server = fakeServer();
+  const r = new Router(bot, store, server as any, "/tmp/cc-tg-hub-r-inbox");
+  await r.handleFrame("c1", { type: "register", sessionId: "s1", name: "n", cwd: "/c" });
+  await r.handleFrame("c2", { type: "register", sessionId: "s2", name: "n", cwd: "/c" }); // reuseKey hands it the same topic as s1
+  await r.handleFrame("c1", { type: "reply", chatId: "-100123", text: "still alive" });
+  expect((bot.sendText as any).mock.calls.length).toBe(1); // s1's record must still exist
+});
+
+test("handleDisconnect of the current socketId offlines the record", async () => {
+  const bot = fakeBot();
+  const store = freshStore();
+  const server = fakeServer();
+  const r = new Router(bot, store, server as any, "/tmp/cc-tg-hub-r-inbox");
+  await r.handleFrame("c1", { type: "register", sessionId: "s1", name: "n", cwd: "/c" });
+  await r.handleFrame("c2", { type: "register", sessionId: "s1", name: "n", cwd: "/c" });
+  r.handleDisconnect("c2"); // the socket the record currently points at
+  expect(store.get("s1")?.status).toBe("offline");
 });
