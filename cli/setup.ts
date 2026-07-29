@@ -4,7 +4,15 @@ import { join } from "node:path";
 import { STATE_DIR, CONFIG_PATH, stopBroker } from "./daemon";
 
 const API = "https://api.telegram.org";
-const SETTINGS_PATH = join(homedir(), ".claude", "settings.json");
+// Claude Code loads user-scope MCP servers from ~/.claude.json (NOT
+// ~/.claude/settings.json, which holds settings only). Writing mcpServers
+// here is what makes `claude` spawn the cc-tg-hub MCP in every project.
+const SETTINGS_PATH = join(homedir(), ".claude.json");
+// Permission allow-rules live in ~/.claude/settings.json (a DIFFERENT file
+// from SETTINGS_PATH above). Pre-allowing the reply tool here means future
+// installs never hit the one-time tool-permission dialog, which otherwise
+// blocks the turn until a human answers — defeating a phone-driven bridge.
+const PERMISSIONS_PATH = join(homedir(), ".claude", "settings.json");
 const CTRL_C = "\u0003";
 const DEL = "\u007f";
 
@@ -125,8 +133,27 @@ export async function setup(): Promise<void> {
   writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2) + "\n");
   ok(`wired MCP into ${SETTINGS_PATH}`);
 
-  console.log("\nDone. Run `claude` in any project — a forum topic appears in your");
-  console.log("group; message it from your phone and Claude replies via the `reply` tool.");
+  let perms: any = {};
+  if (existsSync(PERMISSIONS_PATH)) {
+    try { perms = JSON.parse(readFileSync(PERMISSIONS_PATH, "utf8")); } catch { perms = {}; }
+  }
+  perms.permissions ??= {};
+  perms.permissions.allow ??= [];
+  if (!perms.permissions.allow.includes("mcp__cc-tg-hub__reply")) perms.permissions.allow.push("mcp__cc-tg-hub__reply");
+  writeFileSync(PERMISSIONS_PATH, JSON.stringify(perms, null, 2) + "\n");
+  ok(`pre-allowed mcp__cc-tg-hub__reply in ${PERMISSIONS_PATH}`);
+
+  console.log("\nDone. Launch sessions with the channels flag (research-preview, claude >= 2.x)");
+  console.log("so inbound Telegram messages reach Claude — without it they're silently dropped:");
+  console.log("  claude --dangerously-load-development-channels server:cc-tg-hub");
+  console.log("Alias it: alias claude-tg='claude --dangerously-load-development-channels server:cc-tg-hub'");
+  console.log("Accept the 'Loading development channels' warning at launch (Enter), then");
+  console.log("verify with /status — it must say: Channels: Listening for messages from server:cc-tg-hub");
+  console.log("NOTE: inbound only renders in FRESH conversations — resumed ones (--continue/--resume)");
+  console.log("silently drop channel messages (Claude Code bug, <= 2.1.220).");
+  console.log("\nA forum topic appears in your group per session; message it from your phone");
+  console.log("and Claude replies via the `reply` tool.");
+  console.log("The reply tool is pre-allowed, so replies fire without permission prompts.");
   console.log("\nThe broker starts itself the first time you open `claude` and stays up.");
   console.log("Manage it: cc-tg-hub status | stop | logs | uninstall");
 }
