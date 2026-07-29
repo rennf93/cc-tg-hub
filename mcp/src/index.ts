@@ -24,7 +24,9 @@ let lastChatId: string | undefined;
 const mcp = new Server(
   { name: "cc-tg-hub", version: "0.1.0" },
   {
-    capabilities: { tools: {}, experimental: { "claude/channel": {} } },
+    // Both keys are required: the host only forwards permission requests to
+    // servers declaring "claude/channel/permission" as well as the channel itself.
+    capabilities: { tools: {}, experimental: { "claude/channel": {}, "claude/channel/permission": {} } },
     instructions: [
       "The sender reads Telegram, not this session. Anything you want them to see must go through the reply tool — your transcript output never reaches their chat.",
       "",
@@ -59,6 +61,33 @@ client.onMessage((f) => {
     method: "notifications/claude/channel",
     params: { content: String(f.text ?? ""), meta },
   }).then(() => log(`notification delivered`)).catch((e) => log(`notification FAILED: ${e}`));
+});
+
+// A tool-permission prompt in the session becomes Allow/Deny buttons in the topic.
+// fallbackNotificationHandler takes the raw notification, so no schema (and no zod
+// dependency) is needed. It must never throw: the SDK turns an uncaught error here
+// into a connection-level error, which kills the session's whole MCP link.
+mcp.fallbackNotificationHandler = async (n) => {
+  try {
+    if (n.method !== "notifications/claude/channel/permission_request") return;
+    const p = (n.params ?? {}) as Record<string, unknown>;
+    if (typeof p.request_id !== "string") return;
+    log(`permission ask ${p.request_id} ${String(p.tool_name ?? "?")}`);
+    client.askPermission({
+      requestId: p.request_id,
+      toolName: String(p.tool_name ?? "tool"),
+      description: p.description == null ? undefined : String(p.description),
+      inputPreview: p.input_preview == null ? undefined : String(p.input_preview),
+    });
+  } catch (e) { log(`permission ask FAILED: ${e}`); }
+};
+
+client.onPermissionDecision((f) => {
+  log(`permission ${f.behavior} ${f.requestId}`);
+  mcp.notification({
+    method: "notifications/claude/channel/permission",
+    params: { request_id: f.requestId, behavior: f.behavior },
+  }).catch((e) => log(`permission reply FAILED: ${e}`));
 });
 
 mcp.setRequestHandler(ListToolsRequestSchema, async () => ({

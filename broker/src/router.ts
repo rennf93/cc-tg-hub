@@ -1,7 +1,7 @@
 import type { BotApi } from "./telegram";
 import { SessionsStore } from "./state";
 import type { SocketServer } from "./socket";
-import type { Frame, MessageFrame, ReplyFrame } from "@cc-tg-hub/frames";
+import type { Frame, MessageFrame, ReplyFrame, PermissionAskFrame } from "@cc-tg-hub/frames";
 
 interface TelegramUpdate {
   message?: {
@@ -17,8 +17,18 @@ interface TelegramUpdate {
   };
 }
 
+interface TelegramCallbackUpdate {
+  callback_query?: {
+    id: string;
+    from: { id: number; username?: string };
+    data?: string;
+  };
+}
+
 export class Router {
   private socketToSession = new Map<string, string>();   // socketId -> sessionId
+  private pendingPerms = new Map<string, { sessionId: string; requestId: string; messageId: number }>();
+  private permSeq = 0;
   private bot: BotApi;
   private store: SessionsStore;
   private server: SocketServer;
@@ -37,9 +47,54 @@ export class Router {
         return this.handleRegister(socketId, frame);
       case "reply":
         return this.handleReply(socketId, frame);
+      case "permission_ask":
+        return this.handlePermissionAsk(socketId, frame);
       case "unregister":
         return this.handleDisconnect(socketId);
     }
+  }
+
+  /** A session hit a tool-permission prompt: put Allow/Deny in its topic. */
+  private async handlePermissionAsk(socketId: string, f: PermissionAskFrame): Promise<void> {
+    const sessionId = this.socketToSession.get(socketId);
+    const rec = sessionId ? this.store.get(sessionId) : undefined;
+    if (!rec) return;
+    const lines = [`🔐 ${f.toolName} needs permission`];
+    if (f.description) lines.push(f.description);
+    if (f.inputPreview) lines.push(f.inputPreview.slice(0, 500));
+    // Short token, not the request id: callback_data caps at 64 bytes and the
+    // host's request ids have no documented length limit.
+    const token = String(++this.permSeq);
+    const messageId = await this.bot.sendText(rec.topicId, lines.join("\n"), {
+      buttons: [{ text: "✅ Allow", data: `perm:${token}:allow` }, { text: "⛔️ Deny", data: `perm:${token}:deny` }],
+    });
+    this.pendingPerms.set(token, { sessionId: rec.sessionId, requestId: f.requestId, messageId });
+    this.bumpLastSeen(rec.sessionId);
+  }
+
+  /** An Allow/Deny tap. Routes the answer back to the session that asked. */
+  async processCallback(u: TelegramCallbackUpdate): Promise<void> {
+    const q = u.callback_query;
+    if (!q) return;
+    if (!this.bot.isAllowed(q.from.id)) {                       // trust boundary: only the owner decides
+      await this.bot.answerCallback(q.id, "not allowed").catch(() => {});
+      return;
+    }
+    const m = /^perm:([^:]+):(allow|deny)$/.exec(q.data ?? "");
+    if (!m) return;
+    const [, token, behavior] = m;
+    const p = this.pendingPerms.get(token);
+    if (!p) { await this.bot.answerCallback(q.id, "expired").catch(() => {}); return; }
+    this.pendingPerms.delete(token);
+    const rec = this.store.get(p.sessionId);
+    if (!rec || !rec.socketId || !this.server.has(rec.socketId)) {
+      await this.bot.answerCallback(q.id, "session is gone").catch(() => {});
+      return;
+    }
+    this.server.send(rec.socketId, { type: "permission_decision", requestId: p.requestId, behavior: behavior as "allow" | "deny" });
+    await this.bot.answerCallback(q.id, behavior === "allow" ? "allowed" : "denied").catch(() => {});
+    await this.bot.editText(p.messageId, `${behavior === "allow" ? "✅ allowed" : "⛔️ denied"} — ${q.from.username ?? q.from.id}`).catch(() => {});
+    this.bumpLastSeen(rec.sessionId);
   }
 
   private async handleRegister(socketId: string, f: { sessionId: string; name: string; cwd: string }): Promise<void> {

@@ -59,14 +59,16 @@ async function main(): Promise<void> {
   bot.on("message:text", (ctx) => router.processUpdate(ctx.update as any));
   bot.on("message:photo", (ctx) => router.processUpdate(ctx.update as any));
   bot.on("message:document", (ctx) => router.processUpdate(ctx.update as any));
+  bot.on("callback_query:data", (ctx) => router.processCallback(ctx.update as any));
 
   const stop = () => { try { unlinkSync(pidPath); } catch {} bot.stop(); server.stop(); http.stop(); process.exit(0); };
   process.on("SIGTERM", stop);
   process.on("SIGINT", stop);
 
-  // bot.start() runs the long-poll loop; only message updates needed.
+  // bot.start() runs the long-poll loop. callback_query is required for the
+  // Allow/Deny buttons — Telegram withholds any type not listed here.
   await bot.start({
-    allowed_updates: ["message"],
+    allowed_updates: ["message", "callback_query"],
     onStart: () => process.stderr.write("cc-tg-hub broker: polling Telegram\n"),
   });
 }

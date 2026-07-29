@@ -39,15 +39,23 @@ export class BotApi {
     return r.message_thread_id as number;
   }
 
-  async sendText(topicId: number, text: string, opts: { replyTo?: string; format?: "text" | "markdownv2" } = {}): Promise<number> {
+  async sendText(topicId: number, text: string, opts: { replyTo?: string; format?: "text" | "markdownv2"; buttons?: Array<{ text: string; data: string }> } = {}): Promise<number> {
     const r = await this.call("sendMessage", {
       chat_id: this.groupId,
       message_thread_id: String(topicId),
       text,
       reply_to_message_id: opts.replyTo,
       parse_mode: opts.format === "markdownv2" ? "MarkdownV2" : undefined,
+      reply_markup: opts.buttons
+        ? JSON.stringify({ inline_keyboard: [opts.buttons.map((b) => ({ text: b.text, callback_data: b.data }))] })
+        : undefined,
     });
     return r.message_id as number;
+  }
+
+  /** Dismiss the client-side spinner on a tapped inline button. */
+  async answerCallback(callbackId: string, text?: string): Promise<void> {
+    await this.call("answerCallbackQuery", { callback_query_id: callbackId, text });
   }
 
   async sendPhoto(topicId: number, path: string, caption?: string): Promise<number> {

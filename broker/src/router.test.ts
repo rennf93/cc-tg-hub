@@ -19,6 +19,7 @@ function fakeBot(overrides: Partial<BotApi> = {}): BotApi {
     createTopic: async () => 99,
     sendText: async () => 1,
     sendPhoto: async () => 1,
+    answerCallback: async () => undefined,
     editText: async () => undefined,
     react: async () => undefined,
     downloadFile: async () => "/tmp/x",
@@ -86,6 +87,54 @@ test("handleReply bumps lastSeen", async () => {
   await new Promise((res) => setTimeout(res, 5)); // ensure Date.now() advances
   await r.handleFrame("c1", { type: "reply", chatId: "-100123", text: "yo" });
   expect(store.get("s1")!.lastSeen).toBeGreaterThan(before);
+});
+
+async function askPermission(r: Router, bot: BotApi) {
+  await r.handleFrame("c1", { type: "register", sessionId: "s1", name: "n", cwd: "/c" });
+  await r.handleFrame("c1", { type: "permission_ask", requestId: "req-abc", toolName: "Bash", description: "npm publish", inputPreview: "npm publish --access public" });
+  return (bot.sendText as any).mock.calls[0];
+}
+
+test("permission_ask posts Allow/Deny buttons in the session's topic", async () => {
+  const bot = fakeBot({ sendText: mock(async () => 77) });
+  const r = new Router(bot, freshStore(), fakeServer() as any, "/tmp/cc-tg-hub-r-inbox");
+  const [topicId, text, opts] = await askPermission(r, bot);
+  expect(topicId).toBe(99);                       // the topic createTopic handed this session
+  expect(text).toContain("Bash");
+  expect(text).toContain("npm publish --access public");
+  expect(opts.buttons.map((b: any) => b.data)).toEqual(["perm:1:allow", "perm:1:deny"]);
+});
+
+test("tapping Allow routes a decision frame back to the asking session", async () => {
+  const bot = fakeBot({ sendText: mock(async () => 77), answerCallback: mock(async () => undefined), editText: mock(async () => undefined) });
+  const server = fakeServer();
+  const r = new Router(bot, freshStore(), server as any, "/tmp/cc-tg-hub-r-inbox");
+  await askPermission(r, bot);
+  await r.processCallback({ callback_query: { id: "cb1", from: { id: 7, username: "u" }, data: "perm:1:allow" } } as any);
+  expect(server.sent).toContainEqual({ id: "c1", frame: { type: "permission_decision", requestId: "req-abc", behavior: "allow" } });
+  // Answering twice must not re-fire: the token is consumed.
+  await r.processCallback({ callback_query: { id: "cb2", from: { id: 7 }, data: "perm:1:allow" } } as any);
+  expect(server.sent.filter((s) => s.frame.type === "permission_decision").length).toBe(1);
+});
+
+test("a tap from a user outside the allowlist decides nothing", async () => {
+  const bot = fakeBot({ sendText: mock(async () => 77), answerCallback: mock(async () => undefined), isAllowed: (id: number) => id === 7 });
+  const server = fakeServer();
+  const r = new Router(bot, freshStore(), server as any, "/tmp/cc-tg-hub-r-inbox");
+  await askPermission(r, bot);
+  await r.processCallback({ callback_query: { id: "cb1", from: { id: 999 }, data: "perm:1:allow" } } as any);
+  expect(server.sent.some((s) => s.frame.type === "permission_decision")).toBe(false);
+});
+
+test("a tap for a session whose socket died decides nothing", async () => {
+  const bot = fakeBot({ sendText: mock(async () => 77), answerCallback: mock(async () => undefined) });
+  const live = new Set(["c1"]);
+  const server = fakeServer({ live });
+  const r = new Router(bot, freshStore(), server as any, "/tmp/cc-tg-hub-r-inbox");
+  await askPermission(r, bot);
+  live.delete("c1");                               // session exits before anyone taps
+  await r.processCallback({ callback_query: { id: "cb1", from: { id: 7 }, data: "perm:1:allow" } } as any);
+  expect(server.sent.some((s) => s.frame.type === "permission_decision")).toBe(false);
 });
 
 test("stop() sends a stop frame and marks stopped", async () => {

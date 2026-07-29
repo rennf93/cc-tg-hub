@@ -1,6 +1,6 @@
 # cc-tg-hub — Telegram Mini App for multiple Claude Code sessions
 
-Each Claude Code session becomes a forum topic you chat with from your phone. One shared bot, one broker (the sole Telegram poller), one MCP per session. Starting a new session never kills the old one.
+Each Claude Code session becomes a forum topic you chat with from your phone — including its permission prompts, which arrive as Allow/Deny buttons instead of stalling until you're back at the keyboard. One shared bot, one broker (the sole Telegram poller), one MCP per session. Starting a new session never kills the old one.
 
 - [How it works](#how-it-works) — the full flow, end to end
 - [Setup](#setup) · [Upgrading](#upgrading) · [Mini App](#optional-mini-app-session-management-ui) · [Troubleshooting](#troubleshooting)
@@ -15,7 +15,7 @@ Three kinds of process, and a UNIX socket between them.
 | **MCP** | an MCP server `claude` spawns inside each session; bridges that session to the broker | one per session | dies with its session |
 | **Mini App** | optional React SPA for managing sessions, served by the broker over HTTP | zero or one | optional |
 
-The broker and MCP speak line-delimited JSON frames over `~/.claude/cc-tg-hub/broker.sock` (see `shared/src/frames.ts`). MCP → broker: `register`, `reply`, `unregister`. Broker → MCP: `registered`, `message`, `stop`.
+The broker and MCP speak line-delimited JSON frames over `~/.claude/cc-tg-hub/broker.sock` (see `shared/src/frames.ts`). MCP → broker: `register`, `reply`, `permission_ask`, `unregister`. Broker → MCP: `registered`, `message`, `permission_decision`, `stop`.
 
 ```mermaid
 flowchart LR
@@ -51,6 +51,32 @@ Step 8 is the fragile one, and it needs the channels flag — see [Setup](#setup
 ### Your session → Telegram (outbound)
 
 Claude calls the `reply` tool with the `chat_id` from the inbound block. The MCP sends a `reply` frame; the broker resolves the session's topic and calls `sendMessage` there, followed by `sendPhoto` for any `files`. Transcript output never reaches Telegram — only the `reply` tool does.
+
+### Permission prompts → Allow/Deny in the topic
+
+The reason unattended phone-driving normally dies: a tool call outside your allowlist stops the session until someone is at the keyboard. Instead, the prompt comes to you.
+
+```mermaid
+sequenceDiagram
+    participant H as claude (host)
+    participant M as MCP
+    participant B as broker
+    participant T as Telegram topic
+    H->>M: permission_request<br/>{request_id, tool_name, description, input_preview}
+    M->>B: permission_ask frame
+    B->>T: 🔐 message + [✅ Allow] [⛔️ Deny]
+    T->>B: callback_query (your tap)
+    B->>M: permission_decision frame
+    M->>H: permission {request_id, behavior}
+```
+
+The keyboard prompt stays live the whole time — whichever answers first wins, so nothing is lost if you're back at your desk. Three things are worth knowing:
+
+- **The host only sends these to servers declaring both** `claude/channel` **and** `claude/channel/permission`. Declaring just the channel capability means permission requests never arrive.
+- **Only `allowUserIds` can decide.** A tap from anyone else in the group is refused — otherwise group membership would equal shell access.
+- **Buttons carry a short token, not the request id**, because `callback_data` is capped at 64 bytes. The token is consumed on first use, so a double-tap can't answer twice, and a tap for a session that has since exited reports "session is gone" rather than resolving anything.
+
+`allowed_updates` includes `callback_query` for this; Telegram withholds any update type not listed, so the buttons would otherwise do nothing.
 
 ### Session lifecycle
 
@@ -165,6 +191,7 @@ Work outward from the session — the pipeline crosses three processes, and each
 | Nothing arrives, and it's a resumed conversation | — | upstream limitation; channel messages only render in fresh conversations |
 | Nothing arrives, flag is on | `~/Library/Caches/claude-cli-nodejs/<project>/mcp-logs-cc-tg-hub/*.jsonl` | look for `Channel notifications registered`; an `Uncaught error in notification handler` there means the payload was rejected and the MCP connection was torn down |
 | Message left Telegram but no session saw it | `~/.claude/cc-tg-hub/logs/broker.err.log` | `[trace] forwarding to session …` means routing worked; `drop: …` names the reason (no topic, paused, dead socket) |
+| Session stalls on a permission prompt, no buttons in the topic | `logs/mcp.log` for `permission ask …` | the session predates 0.3.0 — restart it so it picks up the new MCP |
 | Broker seems dead | `cc-tg-hub status`, `cc-tg-hub logs` | it respawns on the next `claude` start |
 | Mini App is blank | `curl localhost:8787/` | `app-dist/` missing, or the broker started before you installed it |
 | Mini App shows `unauthorized` | — | opened outside Telegram, user id not in `allowUserIds`, or the session is older than the 24h freshness window |

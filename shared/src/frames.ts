@@ -28,8 +28,24 @@ export interface MessageFrame {
 export interface UnregisterFrame { type: "unregister" }
 export interface StopFrame { type: "stop" }
 
+/** A tool-permission prompt raised inside a session, to be answered from Telegram. */
+export interface PermissionAskFrame {
+  type: "permission_ask";
+  requestId: string;
+  toolName: string;
+  description?: string;
+  inputPreview?: string;
+}
+/** The tap on Allow/Deny, routed back to the session that asked. */
+export interface PermissionDecisionFrame {
+  type: "permission_decision";
+  requestId: string;
+  behavior: "allow" | "deny";
+}
+
 export type Frame =
-  | RegisterFrame | RegisteredFrame | ReplyFrame | MessageFrame | UnregisterFrame | StopFrame;
+  | RegisterFrame | RegisteredFrame | ReplyFrame | MessageFrame | UnregisterFrame | StopFrame
+  | PermissionAskFrame | PermissionDecisionFrame;
 
 export function encodeFrame(f: Frame): string {
   return JSON.stringify(f) + "\n";

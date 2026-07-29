@@ -2,7 +2,7 @@ import { connect, type Socket } from "node:net";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
-import { encodeFrame, parseFrame, type Frame, type MessageFrame, type RegisteredFrame } from "@cc-tg-hub/frames";
+import { encodeFrame, parseFrame, type Frame, type MessageFrame, type RegisteredFrame, type PermissionAskFrame, type PermissionDecisionFrame } from "@cc-tg-hub/frames";
 
 const DEFAULT_SOCKET = join(homedir(), ".claude", "cc-tg-hub", "broker.sock");
 const PID_PATH = join(homedir(), ".claude", "cc-tg-hub", "broker.pid");
@@ -64,6 +64,7 @@ export class BrokerClient {
   private onMsg: (f: MessageFrame) => void = () => {};
   private onReg: (f: RegisteredFrame) => void = () => {};
   private onStoppedCb: () => void = () => {};
+  private onPermDecision: (f: PermissionDecisionFrame) => void = () => {};
   private stopped = false;
   private sockPath: string;
   private sessionId: string;
@@ -120,6 +121,7 @@ export class BrokerClient {
           try { f = parseFrame(this.buf.slice(0, nl)); } catch { this.buf = this.buf.slice(nl + 1); continue; }
           this.buf = this.buf.slice(nl + 1);
           if (f.type === "message") this.onMsg(f);
+          else if (f.type === "permission_decision") this.onPermDecision(f);
           else if (f.type === "registered") this.onReg(f);
           else if (f.type === "stop") { this.onStoppedCb(); this.disconnect(); }
         }
@@ -130,6 +132,11 @@ export class BrokerClient {
   onMessage(cb: (f: MessageFrame) => void): void { this.onMsg = cb; }
   onRegistered(cb: (f: RegisteredFrame) => void): void { this.onReg = cb; }
   onStopped(cb: () => void): void { this.onStoppedCb = cb; }
+  onPermissionDecision(cb: (f: PermissionDecisionFrame) => void): void { this.onPermDecision = cb; }
+
+  askPermission(f: Omit<PermissionAskFrame, "type">): void {
+    this.sock?.write(encodeFrame({ type: "permission_ask", ...f }));
+  }
 
   sendReply(chatId: string, text: string, opts: { replyTo?: string; files?: string[]; format?: "text" | "markdownv2" } = {}): void {
     this.sock?.write(encodeFrame({ type: "reply", chatId, text, replyTo: opts.replyTo, files: opts.files, format: opts.format }));
