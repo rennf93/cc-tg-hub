@@ -33,3 +33,18 @@ test("socket file is created mode 0o600", async () => {
   server.stop();
   rmSync(p, { force: true });
 });
+
+test("closing a client connection invokes the handler with an unregister frame", async () => {
+  const p = "/tmp/cc-tg-hub-socket-close.sock";
+  rmSync(p, { force: true });
+  const server = new SocketServer(p);
+  const received: any[] = [];
+  await server.start(async (socketId, frame) => { received.push({ socketId, frame }); });
+  const sock = connect(p);
+  await new Promise((r) => sock.once("connect", r));
+  sock.end();
+  await new Promise((r) => setTimeout(r, 80));
+  expect(received.some((e) => e.frame.type === "unregister")).toBe(true);
+  server.stop();
+  rmSync(p, { force: true });
+});

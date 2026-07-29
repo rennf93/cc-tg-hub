@@ -26,6 +26,10 @@ export class SessionsStore {
       for (const r of arr) {
         if (r.paused === undefined) r.paused = false;
         if (r.status === "idle") r.status = "online";   // legacy: idle is now derived
+        // socketIds are per-process (counter resets on restart) — an "online" record
+        // from a prior process points at a socketId that's dead or now reassigned to
+        // a different session. Demote on load; "stopped" is untouched (terminal state).
+        if (r.status === "online") { r.status = "offline"; r.socketId = ""; }
         this.byId.set(r.sessionId, r);
         this.byTopicId.set(r.topicId, r);
       }
@@ -40,6 +44,17 @@ export class SessionsStore {
   upsert(r: SessionRecord): void {
     const prev = this.byId.get(r.sessionId);
     if (prev) this.byTopicId.delete(prev.topicId);
+    // A different sessionId already owns this topic (e.g. reuseKey handed the
+    // topic to a new owner) — evict only records that are truly dead (offline).
+    // "online" stays: it's a live peer still working. "stopped" stays: it's a
+    // tombstone handleRegister relies on to avoid resurrecting a stopped session.
+    // byTopicId tracks only the latest record per topic, so sweep byId directly
+    // to catch older same-topic offline records too.
+    for (const other of this.byId.values()) {
+      if (other.topicId === r.topicId && other.sessionId !== r.sessionId && other.status === "offline") {
+        this.byId.delete(other.sessionId);
+      }
+    }
     this.byId.set(r.sessionId, r);
     this.byTopicId.set(r.topicId, r);
     this.persist();

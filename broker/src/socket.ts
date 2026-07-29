@@ -52,6 +52,10 @@ export class SocketServer {
     sock.on("close", () => {
       this.sockets.delete(socketId);
       this.buffers.delete(sock);
+      // Nobody else observes a dead socket (a killed session never sends an
+      // explicit unregister) — synthesize the existing frame so the router
+      // can mark the session offline. No new frame type needed.
+      void this.handler?.(socketId, { type: "unregister" });
     });
   }
 
@@ -62,6 +66,10 @@ export class SocketServer {
 
   socketIds(): string[] {
     return [...this.sockets.keys()];
+  }
+
+  has(socketId: string): boolean {
+    return this.sockets.has(socketId);
   }
 
   stop(): void {

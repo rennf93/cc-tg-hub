@@ -18,7 +18,7 @@ async function main(): Promise<void> {
     mkdirSync(join(config.stateDir, "logs"), { recursive: true });
     const sink = Bun.file(join(config.stateDir, "logs", "broker.err.log")).writer();
     const orig = process.stderr.write.bind(process.stderr);
-    (process.stderr as any).write = (chunk: any, ...rest: any[]) => { try { sink.write(chunk); } catch {} return orig(chunk, ...rest); };
+    (process.stderr as any).write = (chunk: any, ...rest: any[]) => { try { sink.write(chunk); sink.flush(); } catch {} return orig(chunk, ...rest); };
     process.on("exit", () => { try { sink.end(); } catch {} });
   }
 
@@ -27,9 +27,10 @@ async function main(): Promise<void> {
   const botApi = new BotApi(config.botToken, config.groupId, config.apiRoot, config.allowUserIds);
   const router = new Router(botApi, store, server, config.stateDir);
 
-  await server.start((socketId, frame) => router.handleFrame(socketId, frame));
-  process.stderr.write(`cc-tg-hub broker: socket at ${config.socketPath}\n`);
-
+  // Bind the HTTP port BEFORE the unix socket. The port is atomically exclusive,
+  // so when several MCPs race-spawn brokers at once the losers die here — BEFORE
+  // reaching server.start()'s rmSync(sockPath), which would delete the winner's
+  // bound socket path and leave it pointing at the loser's dead listener.
   const api = new Api(botApi, store, router, config);
   const distDir = join(config.stateDir, "app-dist");   // deploy step will point this at the built app
   const serveApp = existsSync(distDir) ? serveStatic(distDir) : null;
@@ -46,6 +47,9 @@ async function main(): Promise<void> {
     },
   });
   process.stderr.write(`cc-tg-hub broker: http on :${http.port}\n`);
+
+  await server.start((socketId, frame) => router.handleFrame(socketId, frame));
+  process.stderr.write(`cc-tg-hub broker: socket at ${config.socketPath}\n`);
   // Bind succeeded (socket + http): claim the pidfile. A duplicate spawn that
   // lost the bind race fatal-exits before reaching here, so the pidfile always
   // points at the winning broker.
