@@ -20,6 +20,16 @@ The broker starts itself the first time you open `claude` (the MCP claude spawns
 
 > No bot token? The setup step is the only place secrets are needed — the token, group id, and your user id all flow from that one paste + one message.
 
+## Upgrading
+
+Installing the new package is **not** enough. The broker and the MCP both execute `~/.claude/cc-tg-hub/cli.js` — a self-contained copy of the bundle that only `setup` refreshes:
+
+```sh
+bunx cc-tg-hub@latest setup
+```
+
+It stops the running broker, re-copies the bundle, and re-detects your group, so have the bot token to hand and send one message in the group again, exactly as on a first install. Sessions that are already open keep the old MCP until you restart them.
+
 ## Why not the official plugin?
 
 The official Telegram Channels plugin (`telegram@claude-plugins-official`) can only serve one session per bot — each new session SIGTERMs the previous poller (`server.ts:59-69`). cc-tg-hub fixes this with a single-poller broker; sessions register over a UNIX socket and never poll. The broker is lazily spawned by the MCP when `claude` starts and shared across all sessions, so there's exactly one poller no matter how many sessions are open.

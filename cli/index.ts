@@ -1,10 +1,7 @@
 #!/usr/bin/env bun
 import { existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
-import { STATE_DIR, LOG_DIR, statusBroker, stopBroker } from "./daemon";
-
-const SETTINGS_PATH = join(homedir(), ".claude", "settings.json");
+import { STATE_DIR, LOG_DIR, MCP_CONFIG_PATH, PERMISSIONS_PATH, REPLY_TOOL, statusBroker, stopBroker } from "./daemon";
 
 const HELP = `cc-tg-hub — Telegram Mini App for multiple Claude Code sessions
 
@@ -23,7 +20,15 @@ Commands:
   mcp          Run the MCP server (used internally; spawned by claude).
 
 Running \`claude\` in any project is what activates cc-tg-hub — the MCP it
-spawns brings up the broker if it isn't already running.`;
+spawns brings up the broker if it isn't already running.
+
+Inbound messages additionally need the channels flag; without it the bridge
+can send but never receive:
+
+  claude --dangerously-load-development-channels server:cc-tg-hub
+
+Accept the warning it shows at launch, and check \`/status\` reads
+"Channels: Listening for messages from server:cc-tg-hub".`;
 
 async function logs(): Promise<void> {
   if (!existsSync(LOG_DIR)) { console.log("no logs yet (broker has not run as a daemon)"); return; }
@@ -40,21 +45,37 @@ async function logs(): Promise<void> {
   if (!any) console.log("(logs are empty)");
 }
 
+/** Read-modify-write a JSON file, skipping it if absent and writing only when edit() reports a change. */
+function editJson(path: string, edit: (o: any) => boolean): void {
+  if (!existsSync(path)) return;
+  try {
+    const o = JSON.parse(readFileSync(path, "utf8"));
+    if (!edit(o)) return;
+    writeFileSync(path, JSON.stringify(o, null, 2) + "\n");
+  } catch (e) { console.error(`✗ could not update ${path}: ${e}`); }
+}
+
 async function uninstall(): Promise<void> {
   const stopped = await stopBroker();
   console.log(stopped ? "✓ broker stopped" : "• broker was not running");
   try { rmSync(STATE_DIR, { recursive: true, force: true }); console.log(`✓ removed ${STATE_DIR}`); }
   catch (e) { console.error(`✗ could not remove ${STATE_DIR}: ${e}`); }
-  if (existsSync(SETTINGS_PATH)) {
-    try {
-      const settings = JSON.parse(readFileSync(SETTINGS_PATH, "utf8"));
-      if (settings.mcpServers?.["cc-tg-hub"]) {
-        delete settings.mcpServers["cc-tg-hub"];
-        writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2) + "\n");
-        console.log(`✓ removed cc-tg-hub from ${SETTINGS_PATH}`);
-      }
-    } catch (e) { console.error(`✗ could not update ${SETTINGS_PATH}: ${e}`); }
-  }
+  // Unwind both files setup writes. Their paths come from daemon.ts so this can
+  // never again target a file setup stopped using.
+  editJson(MCP_CONFIG_PATH, (o) => {
+    if (!o.mcpServers?.["cc-tg-hub"]) return false;
+    delete o.mcpServers["cc-tg-hub"];
+    console.log(`✓ removed cc-tg-hub from ${MCP_CONFIG_PATH}`);
+    return true;
+  });
+  editJson(PERMISSIONS_PATH, (o) => {
+    const allow: string[] | undefined = o.permissions?.allow;
+    const i = allow?.indexOf(REPLY_TOOL) ?? -1;
+    if (i < 0) return false;
+    allow!.splice(i, 1);
+    console.log(`✓ removed ${REPLY_TOOL} from ${PERMISSIONS_PATH}`);
+    return true;
+  });
   console.log("Uninstalled. (The npm package is still installed — `bun remove -g cc-tg-hub` to remove it.)");
 }
 

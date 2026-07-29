@@ -8,6 +8,16 @@ export const SOCK_PATH = join(STATE_DIR, "broker.sock");
 export const LOG_DIR = join(STATE_DIR, "logs");
 export const CONFIG_PATH = join(STATE_DIR, "config.json");
 
+// The two files setup touches outside STATE_DIR. They live here, not in the
+// commands, because setup writes them and uninstall must unwind exactly the
+// same ones — when each kept its own copy they drifted, and uninstall silently
+// stopped removing anything.
+// claude reads user-scope MCP servers from ~/.claude.json; ~/.claude/settings.json
+// holds settings (permission rules included) only.
+export const MCP_CONFIG_PATH = join(homedir(), ".claude.json");
+export const PERMISSIONS_PATH = join(homedir(), ".claude", "settings.json");
+export const REPLY_TOOL = "mcp__cc-tg-hub__reply";
+
 export function readPid(): number | undefined {
   if (!existsSync(PID_PATH)) return undefined;
   const pid = Number(readFileSync(PID_PATH, "utf8").trim());

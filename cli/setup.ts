@@ -1,18 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, copyFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { STATE_DIR, CONFIG_PATH, stopBroker } from "./daemon";
+import { STATE_DIR, CONFIG_PATH, MCP_CONFIG_PATH, PERMISSIONS_PATH, REPLY_TOOL, stopBroker } from "./daemon";
 
 const API = "https://api.telegram.org";
-// Claude Code loads user-scope MCP servers from ~/.claude.json (NOT
-// ~/.claude/settings.json, which holds settings only). Writing mcpServers
-// here is what makes `claude` spawn the cc-tg-hub MCP in every project.
-const SETTINGS_PATH = join(homedir(), ".claude.json");
-// Permission allow-rules live in ~/.claude/settings.json (a DIFFERENT file
-// from SETTINGS_PATH above). Pre-allowing the reply tool here means future
-// installs never hit the one-time tool-permission dialog, which otherwise
-// blocks the turn until a human answers — defeating a phone-driven bridge.
-const PERMISSIONS_PATH = join(homedir(), ".claude", "settings.json");
 const CTRL_C = "\u0003";
 const DEL = "\u007f";
 
@@ -124,14 +115,14 @@ export async function setup(): Promise<void> {
     : { command: "bun", args: [join(pkgRoot, "mcp", "src", "index.ts")] };
 
   let settings: any = {};
-  if (existsSync(SETTINGS_PATH)) {
-    try { settings = JSON.parse(readFileSync(SETTINGS_PATH, "utf8")); } catch { settings = {}; }
+  if (existsSync(MCP_CONFIG_PATH)) {
+    try { settings = JSON.parse(readFileSync(MCP_CONFIG_PATH, "utf8")); } catch { settings = {}; }
   }
   settings.mcpServers ??= {};
   settings.mcpServers["cc-tg-hub"] = mcpEntry;
   mkdirSync(join(homedir(), ".claude"), { recursive: true });
-  writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2) + "\n");
-  ok(`wired MCP into ${SETTINGS_PATH}`);
+  writeFileSync(MCP_CONFIG_PATH, JSON.stringify(settings, null, 2) + "\n");
+  ok(`wired MCP into ${MCP_CONFIG_PATH}`);
 
   let perms: any = {};
   if (existsSync(PERMISSIONS_PATH)) {
@@ -139,9 +130,9 @@ export async function setup(): Promise<void> {
   }
   perms.permissions ??= {};
   perms.permissions.allow ??= [];
-  if (!perms.permissions.allow.includes("mcp__cc-tg-hub__reply")) perms.permissions.allow.push("mcp__cc-tg-hub__reply");
+  if (!perms.permissions.allow.includes(REPLY_TOOL)) perms.permissions.allow.push(REPLY_TOOL);
   writeFileSync(PERMISSIONS_PATH, JSON.stringify(perms, null, 2) + "\n");
-  ok(`pre-allowed mcp__cc-tg-hub__reply in ${PERMISSIONS_PATH}`);
+  ok(`pre-allowed ${REPLY_TOOL} in ${PERMISSIONS_PATH}`);
 
   console.log("\nDone. Launch sessions with the channels flag (research-preview, claude >= 2.x)");
   console.log("so inbound Telegram messages reach Claude — without it they're silently dropped:");
