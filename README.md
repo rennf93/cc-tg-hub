@@ -122,7 +122,7 @@ Records live in `sessions.json` and carry one of five states, four stored and on
    ```
    Alias it: `alias claude-tg='claude --dangerously-load-development-channels server:cc-tg-hub'`. **Accept the "Loading development channels" warning at launch** (Enter) — without that the channel never attaches and inbound is silently dropped. Verify with `/status`: it should read `Channels: Listening for messages from server:cc-tg-hub`. A forum topic appears in your group; message it from your phone and Claude replies via the `reply` tool.
 
-   > **Known upstream limitation (Claude Code ≤ 2.1.220):** channel messages only render in **fresh** conversations. In a resumed conversation (`--continue`, `--resume`, or the in-app resume picker) the host receives the notifications but silently drops them — verified with a minimal repro. Start a new conversation when you need the Telegram bridge.
+   > **Resumed conversations work too.** This section used to claim channel messages only render in fresh conversations. That was a misdiagnosis of the numeric-`chat_id` bug fixed in 0.2.3 — which destroyed every inbound message regardless of how the session started. Verified on 2.1.220: a message sent to a session running under `--resume` renders normally.
 
 The broker starts itself the first time you open `claude` (the MCP it spawns brings it up as a detached background process) and stays up across sessions. You never start or manage it by hand. If you need to: `cc-tg-hub status` / `cc-tg-hub stop` / `cc-tg-hub logs` / `cc-tg-hub uninstall`.
 
@@ -188,7 +188,6 @@ Work outward from the session — the pipeline crosses three processes, and each
 | Symptom | Check | Usual cause |
 |---|---|---|
 | Replies reach Telegram, nothing comes back | `/status` in the session | launched without the channels flag, or the startup warning wasn't accepted |
-| Nothing arrives, and it's a resumed conversation | — | upstream limitation; channel messages only render in fresh conversations |
 | Nothing arrives, flag is on | `~/Library/Caches/claude-cli-nodejs/<project>/mcp-logs-cc-tg-hub/*.jsonl` | look for `Channel notifications registered`; an `Uncaught error in notification handler` there means the payload was rejected and the MCP connection was torn down |
 | Message left Telegram but no session saw it | `~/.claude/cc-tg-hub/logs/broker.err.log` | `[trace] forwarding to session …` means routing worked; `drop: …` names the reason (no topic, paused, dead socket) |
 | Session stalls on a permission prompt, no buttons in the topic | `logs/mcp.log` for `permission ask …` | the session predates 0.3.0 — restart it so it picks up the new MCP |

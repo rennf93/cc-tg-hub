@@ -140,8 +140,6 @@ export async function setup(): Promise<void> {
   console.log("Alias it: alias claude-tg='claude --dangerously-load-development-channels server:cc-tg-hub'");
   console.log("Accept the 'Loading development channels' warning at launch (Enter), then");
   console.log("verify with /status — it must say: Channels: Listening for messages from server:cc-tg-hub");
-  console.log("NOTE: inbound only renders in FRESH conversations — resumed ones (--continue/--resume)");
-  console.log("silently drop channel messages (Claude Code bug, <= 2.1.220).");
   console.log("\nA forum topic appears in your group per session; message it from your phone");
   console.log("and Claude replies via the `reply` tool.");
   console.log("The reply tool is pre-allowed, so replies fire without permission prompts.");
