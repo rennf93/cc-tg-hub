@@ -33,6 +33,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # Pinned by version tag (repo convention, matching actions/checkout above),
+      # not commit SHA. init and analyze must stay on the same version.
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4.37.6
         with:
